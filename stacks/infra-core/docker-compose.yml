@@ -1,7 +1,25 @@
 version: "3.9"
 
 services:
-  # TODO: Nginx Proxy Manager
-  # TODO: Authelia
-  # TODO: Promtail/Loki client
-  # TODO: eventuale CoreDNS / Pi-hole
+  # Reverse proxy / entrypoint
+  nginx-proxy-manager:
+    image: 'jc21/nginx-proxy-manager:latest'
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "81:81"
+      - "443:443"
+    volumes:
+      - /srv/docker/nginx-proxy-manager/data:/data
+      - /srv/docker/nginx-proxy-manager/letsencrypt:/etc/letsencrypt
+
+  # Authelia per SSO (da configurare)
+  authelia:
+    image: 'authelia/authelia:latest'
+    restart: unless-stopped
+    volumes:
+      - /srv/docker/authelia/config:/config
+    environment:
+      - TZ=Europe/Zurich
+    depends_on:
+      - nginx-proxy-manager

@@ -1,0 +1,31 @@
+default_env: prod
+
+environments:
+  prod:
+    proxmox:
+      api_url: "https://pve-node1.fritz.box:8006/api2/json"
+      node_name: "pve-node1"
+      template_vm_id: 902        # debian-12-docker template
+      infra_vm_id: 110
+      infra_vm_name: "infra-core"
+      apps_vm_id: 120
+      apps_vm_name: "apps-core"
+
+    network:
+      # bridges già configurati sul nodo Proxmox
+      lan_bridge: "vmbr0"        # LAN 192.168.178.0/24
+      internal_bridge: "vmbr2"   # 10.10.0.0/24 - rete app
+      mgmt_bridge: "vmbr3"       # 172.16.0.0/24 - management ssh (in futuro)
+      infra_ip: "10.10.0.2"
+      apps_ip: "10.10.0.3"
+      gw_ip: "10.10.0.1"
+      dns:
+        - "192.168.178.1"        # DNS Fritz!Box per ora
+
+    stacks:
+      infra_core_dir: "stacks/infra-core"
+      apps_core_dir: "stacks/apps-core"
+
+    git:
+      # Dove eventualmente clonerai altri repo/app su infra-core / apps-core
+      apps_root: "/srv/homelab/apps"

@@ -1,14 +1,22 @@
-# Secrets
-secrets/*.yml
-secrets/*.env
-secrets/*.txt
-
-# Editor / OS
-*.swp
-*.swo
-*.bak
-.DS_Store
-
-# Python/virtualenv (se un domani li usi)
+# Python / virtualenv (se mai servirà)
 __pycache__/
+*.pyc
+.venv/
 venv/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# Logs
+logs/
+*.log
+
+# Secrets locali (fuori da git)
+secrets/*
+!secrets/.gitignore
+
+# Config locali per ambienti
+config/*.local.yaml
+config/envs/*.local.yaml

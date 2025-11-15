@@ -1,7 +1,29 @@
 version: "3.9"
 
 services:
-  # TODO: BookStack
-  # TODO: Memos
-  # TODO: Uptime Kuma
-  # TODO: whoami, ecc.
+  bookstack:
+    image: lscr.io/linuxserver/bookstack:latest
+    restart: unless-stopped
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Zurich
+      - APP_URL=https://wiki.bernardolab.it
+    volumes:
+      - /srv/docker/bookstack/config:/config
+    depends_on:
+      - bookstack-db
+
+  bookstack-db:
+    image: lscr.io/linuxserver/mariadb:latest
+    restart: unless-stopped
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Zurich
+      - MYSQL_ROOT_PASSWORD=changeme
+      - MYSQL_DATABASE=bookstack
+      - MYSQL_USER=bookstack
+      - MYSQL_PASSWORD=changeme
+    volumes:
+      - /srv/docker/bookstack/db:/config
