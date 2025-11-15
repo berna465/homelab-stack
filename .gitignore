@@ -20,3 +20,10 @@ secrets/*
 # Config locali per ambienti
 config/*.local.yaml
 config/envs/*.local.yaml
+# Config reali (non committare quella produttiva)
+config/homelab.yaml
+
+# Secrets
+config/secrets/
+*.env
+.env.*

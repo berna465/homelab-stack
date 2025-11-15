@@ -1,0 +1,42 @@
+# Esempio di configurazione homelab
+environment: prod
+
+proxmox:
+  node: "pve-node1"
+  template_vm:
+    id: 902
+    name: "debian-12-docker"
+  networks:
+    lan:
+      bridge: "vmbr0"
+      cidr: "192.168.178.0/24"
+      gateway: "192.168.178.1"
+    internal:
+      bridge: "vmbr2"
+      cidr: "10.10.0.0/24"
+    management:
+      bridge: "vmbr3"
+      cidr: "172.16.0.0/24"
+
+vms:
+  infra-core:
+    vmid: 101
+    name: "infra-core"
+    role: "infra"
+    cpu: 2
+    memory_mb: 4096
+    disks_gb:
+      system: 40
+    networks:
+      - bridge: "vmbr0"   # LAN
+      - bridge: "vmbr2"   # interna apps
+  apps-core:
+    vmid: 102
+    name: "apps-core"
+    role: "apps"
+    cpu: 4
+    memory_mb: 8192
+    disks_gb:
+      system: 80
+    networks:
+      - bridge: "vmbr2"   # solo rete interna

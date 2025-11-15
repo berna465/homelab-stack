@@ -1,29 +1,51 @@
-version: "3.9"
-
 services:
   bookstack:
     image: lscr.io/linuxserver/bookstack:latest
-    restart: unless-stopped
+    container_name: bookstack
+    depends_on:
+      - bookstack-db
+    env_file:
+      - ../../config/secrets/.env.apps-core
     environment:
       - PUID=1000
       - PGID=1000
       - TZ=Europe/Zurich
-      - APP_URL=https://wiki.bernardolab.it
     volumes:
-      - /srv/docker/bookstack/config:/config
-    depends_on:
-      - bookstack-db
+      - ./bookstack/config:/config
+    networks:
+      - proxy
+      - internal
+    restart: unless-stopped
 
   bookstack-db:
     image: lscr.io/linuxserver/mariadb:latest
-    restart: unless-stopped
+    container_name: bookstack-db
+    env_file:
+      - ../../config/secrets/.env.apps-core
     environment:
       - PUID=1000
       - PGID=1000
       - TZ=Europe/Zurich
-      - MYSQL_ROOT_PASSWORD=changeme
-      - MYSQL_DATABASE=bookstack
-      - MYSQL_USER=bookstack
-      - MYSQL_PASSWORD=changeme
     volumes:
-      - /srv/docker/bookstack/db:/config
+      - ./bookstack/db:/config
+    networks:
+      - internal
+    restart: unless-stopped
+
+  memos:
+    image: neosmemo/memos:latest
+    container_name: memos
+    env_file:
+      - ../../config/secrets/.env.apps-core
+    volumes:
+      - ./memos/data:/var/opt/memos
+    networks:
+      - proxy
+      - internal
+    restart: unless-stopped
+
+networks:
+  proxy:
+    external: true
+  internal:
+    driver: bridge
