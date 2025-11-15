@@ -1,49 +1,32 @@
-# Configurazione omelab - esempio
-default_env: lab
+env: lab
 
-environments:
-  lab:
-    proxmox:
-      host: "pve-node1.fritz.box"
-      node: "pve-node1"
-      api_user: "root@pam"
-      api_token_id: "homelab"
-      # questo file va in secrets/ e NON in git
-      api_token_secret_file: "secrets/proxmox_api_token.txt"
+proxmox:
+  node: pve-node1
+  template_id: 902
+  storage: local-lvm
+  bridge_lan: vmbr0
+  bridge_internal: vmbr2
+  bridge_mgmt: vmbr3
+  ssh_key_path: /root/bernardo.pub
+  ci_user: bernardo
 
-    networks:
-      lan:
-        bridge: "vmbr0"
-        cidr: "192.168.178.0/24"
-        gateway: "192.168.178.1"
-        dns: "192.168.178.1"
+vms:
+  infra-core:
+    vmid: 130
+    hostname: infra-core
+    cpu: 4
+    memory_mb: 4096
+    disk_gb: 60
+    ip_mgmt: 172.16.0.10/24
+    gw_mgmt: 172.16.0.1
+    ip_internal: 10.10.0.10/24
+    gw_internal: 10.10.0.1
 
-      internal:
-        bridge: "vmbr2"
-        cidr: "10.10.0.0/24"
-        gateway: "10.10.0.1"
-        dns: "10.10.0.1"
-
-      mgmt:
-        bridge: "vmbr3"
-        cidr: "172.16.0.0/24"
-        gateway: "172.16.0.1"
-        dns: "172.16.0.1"
-
-    vms:
-      infra-core:
-        vmid: 110
-        template: 902            # debian-12-docker template
-        cores: 4
-        memory: 8192            # MB
-        disk_gb: 40
-        mgmt_ip: "172.16.0.2"
-        internal_ip: "10.10.0.2"
-
-      apps-core:
-        vmid: 111
-        template: 902
-        cores: 4
-        memory: 8192
-        disk_gb: 80
-        internal_ip: "10.10.0.3"
+  apps-core:
+    vmid: 120
+    hostname: apps-core
+    cpu: 4
+    memory_mb: 4096
+    disk_gb: 80
+    ip_internal: 10.10.0.20/24
+    gw_internal: 10.10.0.1
