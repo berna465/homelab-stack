@@ -1,0 +1,14 @@
+# Secrets
+secrets/*.yml
+secrets/*.env
+secrets/*.txt
+
+# Editor / OS
+*.swp
+*.swo
+*.bak
+.DS_Store
+
+# Python/virtualenv (se un domani li usi)
+__pycache__/
+venv/

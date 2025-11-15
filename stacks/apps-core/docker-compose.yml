@@ -1,0 +1,7 @@
+version: "3.9"
+
+services:
+  # TODO: BookStack
+  # TODO: Memos
+  # TODO: Uptime Kuma
+  # TODO: whoami, ecc.

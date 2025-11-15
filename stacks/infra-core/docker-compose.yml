@@ -1,0 +1,7 @@
+version: "3.9"
+
+services:
+  # TODO: Nginx Proxy Manager
+  # TODO: Authelia
+  # TODO: Promtail/Loki client
+  # TODO: eventuale CoreDNS / Pi-hole
