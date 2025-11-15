@@ -41,3 +41,4 @@ Conservare in questo repository:
 - I risultati del test
 - Le raccomandazioni di sicurezza basate sui risultati
 # homelab-stack
+# homelab-stack
