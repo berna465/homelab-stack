@@ -1,0 +1,11 @@
+version: "3.8"
+
+services:
+  # TODO: definire i servizi infrastrutturali, ad es.:
+  # nginx-proxy-manager:
+  # authelia:
+  # loki/promtail/grafana:
+  # ecc.
+  placeholder:
+    image: alpine:3
+    command: ["sh", "-c", "echo infra-core stack placeholder && sleep 3600"]
