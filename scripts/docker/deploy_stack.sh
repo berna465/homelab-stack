@@ -17,18 +17,20 @@ require_file() {
 }
 
 resolve_docker_compose_cmd() {
-  if docker compose version >/dev/null 2>&1; then
+  # `docker compose version` can succeed even when daemon socket access is denied.
+  # Check daemon access explicitly with `docker info`.
+  if docker info >/dev/null 2>&1; then
     echo "docker compose"
     return 0
   fi
 
-  if command -v sudo >/dev/null 2>&1 && sudo -n docker compose version >/dev/null 2>&1; then
+  if command -v sudo >/dev/null 2>&1 && sudo -n docker info >/dev/null 2>&1; then
     echo "sudo docker compose"
     return 0
   fi
 
-  printf '[ERROR] Docker compose is not accessible for user %s.\n' "$(id -un)" >&2
-  printf '[ERROR] Fix by adding user to docker group or enabling passwordless sudo for docker.\n' >&2
+  printf '[ERROR] Docker daemon is not accessible for user %s.\n' "$(id -un)" >&2
+  printf '[ERROR] Use a user in docker group or configure passwordless sudo for docker commands.\n' >&2
   exit 1
 }
 
