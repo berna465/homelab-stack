@@ -59,6 +59,8 @@ bash scripts/proxmox/stack.sh
 
 ## Notes
 
+Default deploy path is the VM user home (`/home/<ciuser>/homelab-core`) to avoid root permission issues.
+
 - Scripts use `set -euo pipefail`.
 - Secrets stay outside git via `secrets/.gitignore`.
 - Idempotency: safe to rerun; existing VM is not recreated.

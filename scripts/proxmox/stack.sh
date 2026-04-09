@@ -56,6 +56,7 @@ VM_SSH_HOST="${VM_SSH_HOST:-$VM_IP}"
 VM_SSH_PORT="${VM_SSH_PORT:-22}"
 VM_SSH_PRIVATE_KEY_FILE="${VM_SSH_PRIVATE_KEY_FILE:-${HOME}/.ssh/id_rsa}"
 SSH_OPTS=(-i "${VM_SSH_PRIVATE_KEY_FILE}" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p "${VM_SSH_PORT}")
+SCP_OPTS=(-i "${VM_SSH_PRIVATE_KEY_FILE}" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -P "${VM_SSH_PORT}")
 
 require_cmd qm
 require_cmd ssh
@@ -94,7 +95,8 @@ if [[ "${vm_status}" != "running" ]]; then
   log "Starting VM ${VM_ID}"
   qm start "${VM_ID}"
 else
-  log "VM ${VM_ID} is already running"
+  log "Rebooting VM ${VM_ID} to apply updated cloud-init network settings"
+  qm reboot "${VM_ID}"
 fi
 
 log "Waiting for SSH on ${VM_SSH_HOST}:${VM_SSH_PORT}"
@@ -111,7 +113,7 @@ if ! nc -z "${VM_SSH_HOST}" "${VM_SSH_PORT}" >/dev/null 2>&1; then
 fi
 
 REMOTE_TMP_DIR="/tmp/homelab-stack"
-REMOTE_APP_DIR="${REMOTE_APP_DIR:-/opt/homelab-core}"
+REMOTE_APP_DIR="${REMOTE_APP_DIR:-/home/${VM_CIUSER}/homelab-core}"
 REMOTE_TARGET="${VM_CIUSER}@${VM_SSH_HOST}"
 LOCAL_SECRETS_FILE="${ROOT_DIR}/secrets/homelab-core.env"
 
@@ -119,7 +121,7 @@ LOCAL_SECRETS_FILE="${ROOT_DIR}/secrets/homelab-core.env"
 
 log "Copying Docker stack artifacts to VM"
 ssh "${SSH_OPTS[@]}" "${REMOTE_TARGET}" "mkdir -p '${REMOTE_TMP_DIR}'"
-scp "${SSH_OPTS[@]}" \
+scp "${SCP_OPTS[@]}" \
   "${ROOT_DIR}/docker/homelab-core/docker-compose.yml" \
   "${ROOT_DIR}/docker/homelab-core/.env.example" \
   "${ROOT_DIR}/scripts/docker/deploy_stack.sh" \
