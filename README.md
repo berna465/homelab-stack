@@ -1,23 +1,64 @@
-# homelab-stack
+# homelab-stack (v1)
 
-Infrastructure-as-code per il mio homelab su Proxmox.
+Minimal, idempotent Proxmox + Docker bootstrap for a single VM:
 
-Obiettivi:
+- VM name: `homelab-core`
+- Template: Debian 12 template `902`
+- Network: one bridge (`vmbr0`), one static IP, no VLANs
+- Stack: one minimal Docker Compose app
 
-- Creare in modo riproducibile lo stack infrastrutturale:
-  - VM `infra-core` (proxy, SSO, monitoring, DNS interno in futuro)
-  - VM `apps-core` (BookStack, Memos, strumenti vari)
-- Usare un template Debian 12 docker-ready su Proxmox (ID 902).
-- Configurare rete e cloud-init via script in modo dichiarativo (file YAML).
-- Deployare i docker-compose delle varie VM a partire dai file nel repo.
-- Eseguire post-hook di verifica dopo l'installazione (healthcheck).
+## Repository layout
 
-Struttura principale:
+```text
+config/
+  homelab.env
+secrets/
+  .gitignore
+  homelab-core.env        # local only, ignored by git
+docker/
+  homelab-core/
+    docker-compose.yml
+    .env.example
+scripts/
+  proxmox/
+    stack.sh              # main entrypoint
+  docker/
+    deploy_stack.sh
+    healthcheck.sh
+```
 
-- `config/` — file di configurazione per ambienti (prod, dev, ecc.)
-- `secrets/` — credenziali e chiavi (NON tracciate da git)
-- `scripts/` — script per creare VM, configurare cloud-init, fare deploy
-- `stacks/` — docker-compose per `infra-core`, `apps-core`, ecc.
-- `templates/` — template cloud-init, file base, ecc.
-- `docs/` — documentazione aggiuntiva
+## 1) Configure values
 
+Edit:
+
+- `config/homelab.env`
+
+Create/update local secret file:
+
+- `secrets/homelab-core.env`
+
+## 2) Run
+
+From the Proxmox host (or a machine that can run `qm` and SSH to the VM):
+
+```bash
+bash scripts/proxmox/stack.sh
+```
+
+## What `stack.sh` does
+
+1. Validates required env vars and commands.
+2. Checks if VM exists.
+   - If missing: clones from template `902`.
+   - If present: skips clone.
+3. Applies VM config with `qm set` (CPU, RAM, disk, bridge, static IP cloud-init, user, SSH key).
+4. Starts VM if not already running.
+5. Waits until SSH is reachable.
+6. Copies compose files + scripts + local secrets file to the VM.
+7. Runs remote deploy (`docker compose up -d`) and healthcheck.
+
+## Notes
+
+- Scripts use `set -euo pipefail`.
+- Secrets stay outside git via `secrets/.gitignore`.
+- Idempotency: safe to rerun; existing VM is not recreated.
