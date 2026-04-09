@@ -27,3 +27,6 @@ config/homelab.yaml
 config/secrets/
 *.env
 .env.*
+
+# Keep sample env files tracked
+!**/.env.example
