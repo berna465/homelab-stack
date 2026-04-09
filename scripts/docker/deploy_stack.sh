@@ -16,6 +16,22 @@ require_file() {
   }
 }
 
+resolve_docker_compose_cmd() {
+  if docker compose version >/dev/null 2>&1; then
+    echo "docker compose"
+    return 0
+  fi
+
+  if command -v sudo >/dev/null 2>&1 && sudo -n docker compose version >/dev/null 2>&1; then
+    echo "sudo docker compose"
+    return 0
+  fi
+
+  printf '[ERROR] Docker compose is not accessible for user %s.\n' "$(id -un)" >&2
+  printf '[ERROR] Fix by adding user to docker group or enabling passwordless sudo for docker.\n' >&2
+  exit 1
+}
+
 require_file "${SOURCE_DIR}/docker-compose.yml"
 require_file "${SOURCE_DIR}/healthcheck.sh"
 require_file "${SOURCE_DIR}/homelab-core.env"
@@ -28,8 +44,12 @@ install -m 0600 "${SOURCE_DIR}/homelab-core.env" "${TARGET_DIR}/.env"
 
 cd "${TARGET_DIR}"
 
+DOCKER_COMPOSE_CMD="$(resolve_docker_compose_cmd)"
+export DOCKER_COMPOSE_CMD
+
 log "Starting docker compose stack"
-docker compose --env-file .env up -d
+# shellcheck disable=SC2086
+${DOCKER_COMPOSE_CMD} --env-file .env up -d
 
 log "Running stack healthcheck"
 "${TARGET_DIR}/healthcheck.sh"

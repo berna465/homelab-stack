@@ -64,3 +64,4 @@ Default deploy path is the VM user home (`/home/<ciuser>/homelab-core`) to avoid
 - Scripts use `set -euo pipefail`.
 - Secrets stay outside git via `secrets/.gitignore`.
 - Idempotency: safe to rerun; existing VM is not recreated.
+- Remote deploy now auto-detects whether to run `docker compose` directly or through passwordless `sudo` when socket permissions require it.
