@@ -113,7 +113,7 @@ if ! nc -z "${VM_SSH_HOST}" "${VM_SSH_PORT}" >/dev/null 2>&1; then
 fi
 
 REMOTE_TMP_DIR="/tmp/homelab-stack"
-REMOTE_APP_DIR="${REMOTE_APP_DIR:-/opt/homelab-core}"
+REMOTE_APP_DIR="${REMOTE_APP_DIR:-/home/${VM_CIUSER}/homelab-core}"
 REMOTE_TARGET="${VM_CIUSER}@${VM_SSH_HOST}"
 LOCAL_SECRETS_FILE="${ROOT_DIR}/secrets/homelab-core.env"
 
