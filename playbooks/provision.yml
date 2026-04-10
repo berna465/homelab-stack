@@ -13,32 +13,46 @@
       changed_when: false
       failed_when: false
 
+    - name: Set VM existence flag
+      ansible.builtin.set_fact:
+        vm_exists: "{{ vm_status.rc == 0 }}"
+
+    - name: VM already exists, skipping configuration
+      ansible.builtin.debug:
+        msg: "VM {{ vm_id }} already exists, skipping configuration"
+      when: vm_exists
+
     - name: Clone VM from template when missing
       ansible.builtin.command: >-
         qm clone {{ vm_template_id }} {{ vm_id }} --name {{ vm_name }}
-      when: vm_status.rc != 0
+      when: not vm_exists
 
     - name: Configure CPU and memory
       ansible.builtin.command: >-
         qm set {{ vm_id }} --cores {{ vm_cores }} --memory {{ vm_memory }}
+      when: not vm_exists
 
     - name: Configure network bridge
       ansible.builtin.command: >-
         qm set {{ vm_id }} --net0 virtio,bridge={{ vm_bridge }}
+      when: not vm_exists
 
     - name: Configure cloud-init network and user
       ansible.builtin.command: >-
         qm set {{ vm_id }} --ipconfig0 {{ vm_ipconfig0 }} --ciuser {{ vm_ci_user }}
+      when: not vm_exists
 
     - name: Upload SSH public key file to Proxmox node
       ansible.builtin.copy:
         dest: /tmp/homelab-core.pub
         content: "{{ vm_ssh_public_key }}"
         mode: '0600'
+      when: not vm_exists
 
     - name: Configure cloud-init SSH key
       ansible.builtin.command: >-
         qm set {{ vm_id }} --sshkeys /tmp/homelab-core.pub
+      when: not vm_exists
 
     - name: Start VM
       ansible.builtin.command: "qm start {{ vm_id }}"
