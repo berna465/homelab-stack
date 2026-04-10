@@ -2,6 +2,9 @@
 - name: Provision homelab-core VM on Proxmox
   hosts: proxmox
   gather_facts: false
+  vars_files:
+    - ../group_vars/all.yml
+    - ../group_vars/homelab_core.yml
 
   tasks:
     - name: Check whether VM already exists
