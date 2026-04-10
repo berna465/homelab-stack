@@ -1,0 +1,53 @@
+---
+- name: Provision homelab-core VM on Proxmox
+  hosts: proxmox
+  gather_facts: false
+  vars_files:
+    - ../group_vars/all.yml
+    - ../group_vars/homelab_core.yml
+
+  tasks:
+    - name: Check whether VM already exists
+      ansible.builtin.command: "qm status {{ vm_id }}"
+      register: vm_status
+      changed_when: false
+      failed_when: false
+
+    - name: Clone VM from template when missing
+      ansible.builtin.command: >-
+        qm clone {{ vm_template_id }} {{ vm_id }} --name {{ vm_name }}
+      when: vm_status.rc != 0
+
+    - name: Configure CPU and memory
+      ansible.builtin.command: >-
+        qm set {{ vm_id }} --cores {{ vm_cores }} --memory {{ vm_memory }}
+
+    - name: Configure network bridge
+      ansible.builtin.command: >-
+        qm set {{ vm_id }} --net0 virtio,bridge={{ vm_bridge }}
+
+    - name: Configure cloud-init network and user
+      ansible.builtin.command: >-
+        qm set {{ vm_id }} --ipconfig0 {{ vm_ipconfig0 }} --ciuser {{ vm_ci_user }}
+
+    - name: Configure cloud-init SSH key
+      ansible.builtin.command: >-
+        qm set {{ vm_id }} --sshkeys {{ vm_ssh_public_key | quote }}
+
+    - name: Start VM
+      ansible.builtin.command: "qm start {{ vm_id }}"
+      register: vm_start
+      failed_when: vm_start.rc != 0 and ('already running' not in vm_start.stderr | lower)
+      changed_when: "'already running' not in vm_start.stderr | lower"
+
+- name: Wait for VM SSH
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Wait until SSH is reachable on homelab-core
+      ansible.builtin.wait_for:
+        host: "{{ hostvars['homelab-core'].ansible_host }}"
+        port: 22
+        delay: 5
+        timeout: 300
+        state: started
