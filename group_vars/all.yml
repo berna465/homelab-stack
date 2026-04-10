@@ -16,3 +16,20 @@ vm_ipconfig0: ip=192.168.178.210/24,gw=192.168.178.1
 vm_ssh_public_key: "{{ lookup('file', lookup('env', 'HOME') + '/.ssh/id_rsa.pub') }}"
 
 homelab_core_app_dir: /opt/homelab-core
+
+# Dedicated application data disk settings.
+vm_data_disk_slot: scsi1
+vm_data_disk_storage: local-lvm
+vm_data_disk_size_gb: 40
+
+# Set to an explicit device path (for example /dev/sdb) to skip auto-detection.
+vm_data_disk_device: ''
+vm_data_disk_filesystem: ext4
+vm_data_mount_point: /data
+vm_data_subdirectories:
+  - apps
+  - db
+  - memos
+  - journiv
+  - bookstack
+

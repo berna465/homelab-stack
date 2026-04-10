@@ -1,0 +1,23 @@
+---
+- name: Attach data disk to homelab-core VM on Proxmox
+  hosts: proxmox
+  gather_facts: false
+  vars_files:
+    - ../group_vars/all.yml
+
+  tasks:
+    - name: Read VM configuration
+      ansible.builtin.command: "qm config {{ vm_id }}"
+      register: vm_config
+      changed_when: false
+
+    - name: Check if configured data disk slot already exists
+      ansible.builtin.set_fact:
+        data_disk_slot_exists: "{{ vm_config.stdout is search('^' ~ vm_data_disk_slot ~ ':', multiline=True) }}"
+
+    - name: Attach data disk when slot is missing
+      ansible.builtin.command: >-
+        qm set {{ vm_id }}
+        --{{ vm_data_disk_slot }}
+        {{ vm_data_disk_storage }}:{{ vm_data_disk_size_gb }}
+      when: not data_disk_slot_exists
