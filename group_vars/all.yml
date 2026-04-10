@@ -1,0 +1,18 @@
+# Shared defaults for the homelab v1 workflow.
+proxmox_node_host: proxmox.home.bernardolab.it
+
+vm_template_id: 902
+vm_id: 210
+vm_name: homelab-core
+
+vm_cores: 2
+vm_memory: 2048
+vm_bridge: vmbr0
+vm_ci_user: debian
+vm_ipconfig0: ip=192.168.178.210/24,gw=192.168.178.1
+
+# Public key used by cloud-init for the VM user.
+# Override this value with your own key before running provision.
+vm_ssh_public_key: "{{ lookup('file', lookup('env', 'HOME') + '/.ssh/id_rsa.pub') }}"
+
+homelab_core_app_dir: /opt/homelab-core
