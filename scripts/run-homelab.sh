@@ -66,9 +66,12 @@ resolve_private_key_for_public() {
   done
 
   if [[ -n "${preferred_private_key}" && -f "${preferred_private_key}" ]]; then
-    fail "Configured SSH key pair mismatch: ${preferred_private_key} does not match ${public_key}, and no matching private key was found in ${HOME}/.ssh"
+    # Keep working with the configured key even when it cannot be derived
+    # non-interactively (e.g. passphrase-protected private key).
+    echo "${preferred_private_key}"
+    return 0
   fi
-  fail "No private key found in ${HOME}/.ssh matching ${public_key}"
+  fail "No private key found in ${HOME}/.ssh matching ${public_key} (and no usable SSH_PRIVATE_KEY_FILE configured)"
 }
 
 build_ssh_opts() {
