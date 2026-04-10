@@ -30,9 +30,15 @@
       ansible.builtin.command: >-
         qm set {{ vm_id }} --ipconfig0 {{ vm_ipconfig0 }} --ciuser {{ vm_ci_user }}
 
+    - name: Upload SSH public key file to Proxmox node
+      ansible.builtin.copy:
+        dest: /tmp/homelab-core.pub
+        content: "{{ vm_ssh_public_key }}"
+        mode: '0600'
+
     - name: Configure cloud-init SSH key
       ansible.builtin.command: >-
-        qm set {{ vm_id }} --sshkeys {{ vm_ssh_public_key | quote }}
+        qm set {{ vm_id }} --sshkeys /tmp/homelab-core.pub
 
     - name: Start VM
       ansible.builtin.command: "qm start {{ vm_id }}"
