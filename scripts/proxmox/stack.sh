@@ -160,6 +160,13 @@ LOCAL_SECRETS_FILE="${ROOT_DIR}/secrets/homelab-core.env"
 
 [[ -f "${LOCAL_SECRETS_FILE}" ]] || fail "Missing secrets file: ${LOCAL_SECRETS_FILE}"
 
+if [[ "${SKIP_DEPLOY:-0}" == "1" ]]; then
+  log "SKIP_DEPLOY=1 set; provisioning finished without docker deployment"
+  exit 0
+fi
+
+log "Waiting for SSH key authentication"
+
 resolve_remote_user() {
   local candidate
   for candidate in "${VM_CIUSER}" "${TEMPLATE_CIUSER:-}" ubuntu debian; do
@@ -173,7 +180,7 @@ resolve_remote_user() {
 }
 
 REMOTE_USER=""
-for _ in $(seq 1 45); do
+for _ in $(seq 1 120); do
   if REMOTE_USER="$(resolve_remote_user)"; then
     break
   fi
@@ -186,11 +193,6 @@ if [[ "${REMOTE_USER}" != "${VM_CIUSER}" ]]; then
 fi
 
 REMOTE_TARGET="${REMOTE_USER}@${VM_SSH_HOST}"
-
-if [[ "${SKIP_DEPLOY:-0}" == "1" ]]; then
-  log "SKIP_DEPLOY=1 set; provisioning finished without docker deployment"
-  exit 0
-fi
 
 log "Copying Docker stack artifacts to VM"
 ssh "${SSH_OPTS[@]}" "${REMOTE_TARGET}" "mkdir -p '${REMOTE_TMP_DIR}'"
