@@ -22,12 +22,16 @@ homelab-stack/
 ├── playbooks/
 │   ├── provision.yml
 │   ├── deploy.yml                 # whoami smoke-test stack
-│   └── deploy-memos.yml           # memos app stack
+│   ├── deploy-memos.yml           # memos app stack
+│   └── deploy-journiv.yml         # journiv app stack
 └── files/
     └── homelab-core/
         ├── docker-compose.yml     # whoami smoke-test stack
         ├── .env.example           # whoami example env
         └── memos/
+            ├── docker-compose.yml
+            └── .env.example
+        └── journiv/
             ├── docker-compose.yml
             └── .env.example
 ```
@@ -109,6 +113,30 @@ If deployment is healthy, the endpoint returns `HTTP/1.1 200`.
 Open in browser:
 
 - `http://192.168.178.210:5230`
+
+### 7) Deploy journiv stack
+
+```bash
+ansible-playbook playbooks/deploy-journiv.yml
+```
+
+What this playbook does:
+
+- creates `/opt/journiv` and `/opt/journiv/data` (plus app/postgres/valkey subdirectories)
+- copies `files/homelab-core/journiv/docker-compose.yml`
+- copies `files/homelab-core/journiv/.env.example` to `/opt/journiv/.env`
+- runs `docker compose up -d`
+- checks `http://127.0.0.1:8010/` from the VM
+
+### 8) Test journiv externally
+
+```bash
+curl -i http://192.168.178.210:8010/
+```
+
+Open in browser:
+
+- `http://192.168.178.210:8010`
 
 ## Notes
 

@@ -1,0 +1,53 @@
+---
+- name: Deploy journiv stack to homelab-core
+  hosts: homelab_core
+  gather_facts: false
+  become: true
+  vars_files:
+    - ../group_vars/all.yml
+    - ../group_vars/homelab_core.yml
+
+  tasks:
+    - name: Ensure journiv application directory exists
+      ansible.builtin.file:
+        path: "{{ journiv_app_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Ensure journiv data directories exist
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - "{{ journiv_data_dir }}"
+        - "{{ journiv_data_dir }}/app"
+        - "{{ journiv_data_dir }}/postgres"
+        - "{{ journiv_data_dir }}/valkey"
+
+    - name: Copy journiv docker-compose definition
+      ansible.builtin.copy:
+        src: ../files/homelab-core/journiv/docker-compose.yml
+        dest: "{{ journiv_app_dir }}/docker-compose.yml"
+        mode: '0644'
+
+    - name: Copy journiv environment file
+      ansible.builtin.copy:
+        src: ../files/homelab-core/journiv/.env.example
+        dest: "{{ journiv_app_dir }}/.env"
+        mode: '0644'
+
+    - name: Start journiv service with docker compose
+      ansible.builtin.command: docker compose up -d
+      args:
+        chdir: "{{ journiv_app_dir }}"
+
+    - name: Verify journiv endpoint returns 200
+      ansible.builtin.uri:
+        url: "{{ journiv_healthcheck_url }}"
+        status_code: "{{ journiv_healthcheck_status }}"
+        return_content: false
+      register: journiv_health
+      until: journiv_health.status == journiv_healthcheck_status
+      retries: 20
+      delay: 5
