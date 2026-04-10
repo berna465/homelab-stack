@@ -11,14 +11,13 @@
       register: vm_config
       changed_when: false
 
-    - name: Read configured root disk size in GiB
+    - name: Read configured root disk size from Proxmox config
       ansible.builtin.shell: |
         set -euo pipefail
         qm config {{ vm_id }} \
           | awk -F'size=' '/^{{ vm_root_disk_slot }}:/{print $2}' \
           | awk -F',' '{print $1}' \
-          | sed 's/[[:space:]]//g' \
-          | sed 's/[Gg]$//'
+          | sed 's/[[:space:]]//g'
       args:
         executable: /bin/bash
       register: current_root_disk_size
@@ -31,25 +30,35 @@
 
     - name: Set root disk resize facts
       ansible.builtin.set_fact:
-        current_root_disk_size_gb: "{{ current_root_disk_size.stdout | trim | int }}"
-        target_root_disk_size_gb: "{{ vm_root_disk_size_gb | int }}"
+        current_root_disk_size_raw: "{{ current_root_disk_size.stdout | trim }}"
+        target_root_disk_size_raw: "{{ vm_root_disk_size_gb | string | trim }}"
+        current_root_disk_size_gb: "{{ (current_root_disk_size.stdout | trim | regex_replace('[^0-9]', '')) | int }}"
+        target_root_disk_size_gb: "{{ (vm_root_disk_size_gb | string | trim | regex_replace('[^0-9]', '')) | int }}"
+
+    - name: Show parsed root disk sizes
+      ansible.builtin.debug:
+        msg:
+          - "Current detected disk size: {{ current_root_disk_size_raw }}"
+          - "Requested target disk size: {{ target_root_disk_size_raw }}"
+          - "Parsed current disk size (GiB): {{ current_root_disk_size_gb }}"
+          - "Parsed target disk size (GiB): {{ target_root_disk_size_gb }}"
 
     - name: Fail when requested size would shrink the root disk
       ansible.builtin.fail:
         msg: >-
           Requested vm_root_disk_size_gb={{ target_root_disk_size_gb }}G is smaller than
           current size {{ current_root_disk_size_gb }}G. Shrinking disks is not supported.
-      when: target_root_disk_size_gb < current_root_disk_size_gb
+      when: (target_root_disk_size_gb | int) < (current_root_disk_size_gb | int)
 
     - name: Resize root disk when target is larger
       ansible.builtin.command: >-
-        qm resize {{ vm_id }} {{ vm_root_disk_slot }} +{{ target_root_disk_size_gb - current_root_disk_size_gb }}G
-      when: target_root_disk_size_gb > current_root_disk_size_gb
+        qm resize {{ vm_id }} {{ vm_root_disk_slot }} +{{ (target_root_disk_size_gb | int) - (current_root_disk_size_gb | int) }}G
+      when: (target_root_disk_size_gb | int) > (current_root_disk_size_gb | int)
 
     - name: Root disk already at requested size
       ansible.builtin.debug:
         msg: "Root disk already at {{ current_root_disk_size_gb }}G; nothing to resize on Proxmox"
-      when: target_root_disk_size_gb == current_root_disk_size_gb
+      when: (target_root_disk_size_gb | int) == (current_root_disk_size_gb | int)
 
 - name: Expand root partition and filesystem inside homelab-core
   hosts: homelab_core
