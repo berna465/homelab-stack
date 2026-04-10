@@ -1,0 +1,3 @@
+# Service endpoint checks for the minimal Docker stack.
+homelab_core_healthcheck_url: http://127.0.0.1:8080
+homelab_core_healthcheck_status: 200
