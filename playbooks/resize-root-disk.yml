@@ -84,15 +84,21 @@
       register: root_source
       changed_when: false
 
-    - name: Capture root disk parent and partition number
-      ansible.builtin.command: "lsblk -no PKNAME,PARTNUM {{ root_source.stdout | trim }}"
-      register: root_partition_info
+    - name: Capture root disk parent device
+      ansible.builtin.command: "lsblk -no PKNAME {{ root_source.stdout | trim }}"
+      register: root_parent_disk
       changed_when: false
 
     - name: Set root expansion facts
       ansible.builtin.set_fact:
-        root_partition_parent: "{{ (root_partition_info.stdout | trim).split()[0] }}"
-        root_partition_number: "{{ (root_partition_info.stdout | trim).split()[1] }}"
+        root_partition_parent: "{{ root_parent_disk.stdout | trim }}"
+        root_partition_number: >-
+          {{
+            (root_source.stdout | trim)
+            | regex_replace('^/dev/', '')
+            | regex_replace('^' ~ (root_parent_disk.stdout | trim), '')
+            | int
+          }}
 
     - name: Expand root partition to fill disk
       ansible.builtin.command: >-
