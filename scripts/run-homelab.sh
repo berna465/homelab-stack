@@ -1,50 +1,135 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Script entrypoint per il mio homelab.
-# TODO: implementare step-by-step:
-#  - lettura config YAML
-#  - creazione VM da template
-#  - configurazione cloud-init
-#  - deploy docker-compose su infra-core e apps-core
-#  - post-hook di verifica
-
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+CONFIG_FILE="${REPO_ROOT}/config/homelab.env"
+BUILD_TEMPLATE_SCRIPT="${REPO_ROOT}/scripts/proxmox/build_template.sh"
+PROVISION_SCRIPT="${REPO_ROOT}/scripts/provision-vms.sh"
+STACK_SCRIPT="${REPO_ROOT}/scripts/proxmox/stack.sh"
+DESTROY_SCRIPT="${REPO_ROOT}/scripts/proxmox/destroy_homelab.sh"
+BOOTSTRAP_SCRIPT="${REPO_ROOT}/scripts/bootstrap-node.sh"
 
-ENV_NAME="${1:-prod}"
-CONFIG_FILE="${REPO_ROOT}/config/homelab.config.yaml"
+log() {
+  printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"
+}
 
-echo "=== homelab-stack bootstrap ==="
-echo "Environment: ${ENV_NAME}"
-echo "Config file: ${CONFIG_FILE}"
-echo
-
-if ! command -v yq >/dev/null 2>&1; then
-  echo "ERRORE: 'yq' non trovato. Installalo (es. 'apt install yq' oppure 'snap install yq')."
+fail() {
+  printf '[ERROR] %s\n' "$*" >&2
   exit 1
-fi
+}
 
-if ! command -v qm >/dev/null 2>&1; then
-  echo "ERRORE: questo script va eseguito su un nodo Proxmox (comando 'qm' mancante)."
-  exit 1
-fi
+usage() {
+  cat <<USAGE
+Usage: bash scripts/run-homelab.sh [all|template|provision|bootstrap|stack|destroy [vm|template|all]]
 
-if [ ! -f "${CONFIG_FILE}" ]; then
-  echo "ERRORE: file di config non trovato: ${CONFIG_FILE}"
-  exit 1
-fi
+Commands:
+  all        Build template -> provision VM -> bootstrap node (default)
+  template   Build/refresh template only
+  provision  Provision VM only (no docker deploy)
+  bootstrap  Bootstrap node only (run scripts/bootstrap-node.sh remotely)
+  stack      Legacy stack flow (provision + deploy in one script)
+  destroy    Destroy resources (default target: vm)
+USAGE
+}
 
-# Esempio di lettura dal config (prova che yq funziona)
-PROXMOX_NODE=$(yq ".environments.${ENV_NAME}.proxmox.node_name" "${CONFIG_FILE}")
-TEMPLATE_ID=$(yq ".environments.${ENV_NAME}.proxmox.template_vm_id" "${CONFIG_FILE}")
+require_cmd() {
+  command -v "$1" >/dev/null 2>&1 || fail "Missing required command: $1"
+}
 
-echo "Proxmox node: ${PROXMOX_NODE}"
-echo "Template ID : ${TEMPLATE_ID}"
-echo
+resolve_remote_user() {
+  local host="$1"
+  local key="$2"
+  local port="$3"
+  local candidate
+  local opts=(-i "${key}" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p "${port}")
+  for candidate in "${VM_CIUSER}" "${TEMPLATE_CIUSER:-}" ubuntu debian; do
+    [[ -n "${candidate}" ]] || continue
+    if ssh "${opts[@]}" "${candidate}@${host}" "true" >/dev/null 2>&1; then
+      echo "${candidate}"
+      return 0
+    fi
+  done
+  return 1
+}
 
-echo "Per ora lo script è solo uno scheletro."
-echo "Prossimi passi:"
-echo "  - implementare funzione create_vm_infra_core"
-echo "  - implementare funzione create_vm_apps_core"
-echo "  - generare cloud-init per rete + utente bernardo"
-echo "  - clonare e/o deployare i docker-compose su ciascuna VM"
+run_remote_bootstrap() {
+  local host="${VM_SSH_HOST:-${VM_IP_CIDR%%/*}}"
+  local port="${VM_SSH_PORT:-22}"
+  local key="${VM_SSH_PRIVATE_KEY_FILE:-${HOME}/.ssh/id_rsa}"
+  local user=""
+
+  [[ -f "${key}" ]] || fail "SSH private key not found: ${key}"
+
+  for _ in $(seq 1 45); do
+    if user="$(resolve_remote_user "${host}" "${key}" "${port}")"; then
+      break
+    fi
+    sleep 2
+  done
+
+  [[ -n "${user}" ]] || fail "Unable to authenticate on ${host} for bootstrap"
+
+  local target="${user}@${host}"
+  local ssh_opts=(-i "${key}" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p "${port}")
+
+  log "Copying bootstrap-node.sh to ${target}"
+  scp "${ssh_opts[@]}" "${BOOTSTRAP_SCRIPT}" "${target}:/tmp/bootstrap-node.sh"
+
+  log "Running bootstrap-node.sh remotely"
+  ssh "${ssh_opts[@]}" "${target}" "chmod +x /tmp/bootstrap-node.sh && (sudo -n bash /tmp/bootstrap-node.sh homelab-core || bash /tmp/bootstrap-node.sh homelab-core)"
+}
+
+COMMAND="${1:-all}"
+DESTROY_TARGET="${2:-vm}"
+
+[[ -f "${CONFIG_FILE}" ]] || fail "Configuration file not found: ${CONFIG_FILE}"
+# shellcheck disable=SC1090
+source "${CONFIG_FILE}"
+
+[[ -x "${BUILD_TEMPLATE_SCRIPT}" ]] || fail "Template builder not executable: ${BUILD_TEMPLATE_SCRIPT}"
+[[ -x "${PROVISION_SCRIPT}" ]] || fail "Provision script not executable: ${PROVISION_SCRIPT}"
+[[ -x "${STACK_SCRIPT}" ]] || fail "Stack script not executable: ${STACK_SCRIPT}"
+[[ -x "${DESTROY_SCRIPT}" ]] || fail "Destroy script not executable: ${DESTROY_SCRIPT}"
+[[ -x "${BOOTSTRAP_SCRIPT}" ]] || fail "Bootstrap script not executable: ${BOOTSTRAP_SCRIPT}"
+
+require_cmd qm
+require_cmd ssh
+require_cmd scp
+
+case "${COMMAND}" in
+  all)
+    log "Running full homelab pipeline: template -> provision -> bootstrap"
+    bash "${BUILD_TEMPLATE_SCRIPT}"
+    bash "${PROVISION_SCRIPT}"
+    run_remote_bootstrap
+    ;;
+  template)
+    log "Running template builder only"
+    bash "${BUILD_TEMPLATE_SCRIPT}"
+    ;;
+  provision)
+    log "Running VM provisioning only"
+    bash "${PROVISION_SCRIPT}"
+    ;;
+  bootstrap)
+    log "Running bootstrap only"
+    run_remote_bootstrap
+    ;;
+  stack)
+    log "Running legacy stack flow"
+    bash "${STACK_SCRIPT}"
+    ;;
+  destroy)
+    log "Destroying resources: ${DESTROY_TARGET}"
+    bash "${DESTROY_SCRIPT}" "${DESTROY_TARGET}"
+    ;;
+  -h|--help|help)
+    usage
+    ;;
+  *)
+    usage
+    fail "Unknown command: ${COMMAND}"
+    ;;
+esac
+
+log "Pipeline completed successfully"
