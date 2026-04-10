@@ -1,50 +1,72 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Script entrypoint per il mio homelab.
-# TODO: implementare step-by-step:
-#  - lettura config YAML
-#  - creazione VM da template
-#  - configurazione cloud-init
-#  - deploy docker-compose su infra-core e apps-core
-#  - post-hook di verifica
-
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+CONFIG_FILE="${REPO_ROOT}/config/homelab.env"
+BUILD_TEMPLATE_SCRIPT="${REPO_ROOT}/scripts/proxmox/build_template.sh"
+STACK_SCRIPT="${REPO_ROOT}/scripts/proxmox/stack.sh"
+DESTROY_SCRIPT="${REPO_ROOT}/scripts/proxmox/destroy_homelab.sh"
 
-ENV_NAME="${1:-prod}"
-CONFIG_FILE="${REPO_ROOT}/config/homelab.config.yaml"
+log() {
+  printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"
+}
 
-echo "=== homelab-stack bootstrap ==="
-echo "Environment: ${ENV_NAME}"
-echo "Config file: ${CONFIG_FILE}"
-echo
-
-if ! command -v yq >/dev/null 2>&1; then
-  echo "ERRORE: 'yq' non trovato. Installalo (es. 'apt install yq' oppure 'snap install yq')."
+fail() {
+  printf '[ERROR] %s\n' "$*" >&2
   exit 1
-fi
+}
 
-if ! command -v qm >/dev/null 2>&1; then
-  echo "ERRORE: questo script va eseguito su un nodo Proxmox (comando 'qm' mancante)."
-  exit 1
-fi
+usage() {
+  cat <<USAGE
+Usage: bash scripts/run-homelab.sh [all|template|stack|destroy [vm|template|all]]
 
-if [ ! -f "${CONFIG_FILE}" ]; then
-  echo "ERRORE: file di config non trovato: ${CONFIG_FILE}"
-  exit 1
-fi
+Commands:
+  all       Build/refresh template, then provision+deploy stack (default)
+  template  Build/refresh template only
+  stack     Provision VM + deploy stack only
+  destroy   Destroy resources (default target: vm)
+USAGE
+}
 
-# Esempio di lettura dal config (prova che yq funziona)
-PROXMOX_NODE=$(yq ".environments.${ENV_NAME}.proxmox.node_name" "${CONFIG_FILE}")
-TEMPLATE_ID=$(yq ".environments.${ENV_NAME}.proxmox.template_vm_id" "${CONFIG_FILE}")
+require_cmd() {
+  command -v "$1" >/dev/null 2>&1 || fail "Missing required command: $1"
+}
 
-echo "Proxmox node: ${PROXMOX_NODE}"
-echo "Template ID : ${TEMPLATE_ID}"
-echo
+COMMAND="${1:-all}"
+DESTROY_TARGET="${2:-vm}"
 
-echo "Per ora lo script è solo uno scheletro."
-echo "Prossimi passi:"
-echo "  - implementare funzione create_vm_infra_core"
-echo "  - implementare funzione create_vm_apps_core"
-echo "  - generare cloud-init per rete + utente bernardo"
-echo "  - clonare e/o deployare i docker-compose su ciascuna VM"
+[[ -f "${CONFIG_FILE}" ]] || fail "Configuration file not found: ${CONFIG_FILE}"
+[[ -x "${BUILD_TEMPLATE_SCRIPT}" ]] || fail "Template builder not executable: ${BUILD_TEMPLATE_SCRIPT}"
+[[ -x "${STACK_SCRIPT}" ]] || fail "Stack script not executable: ${STACK_SCRIPT}"
+[[ -x "${DESTROY_SCRIPT}" ]] || fail "Destroy script not executable: ${DESTROY_SCRIPT}"
+
+require_cmd qm
+
+case "${COMMAND}" in
+  all)
+    log "Running full homelab pipeline: template + stack"
+    bash "${BUILD_TEMPLATE_SCRIPT}"
+    bash "${STACK_SCRIPT}"
+    ;;
+  template)
+    log "Running template builder only"
+    bash "${BUILD_TEMPLATE_SCRIPT}"
+    ;;
+  stack)
+    log "Running stack provisioning/deploy only"
+    bash "${STACK_SCRIPT}"
+    ;;
+  destroy)
+    log "Destroying resources: ${DESTROY_TARGET}"
+    bash "${DESTROY_SCRIPT}" "${DESTROY_TARGET}"
+    ;;
+  -h|--help|help)
+    usage
+    ;;
+  *)
+    usage
+    fail "Unknown command: ${COMMAND}"
+    ;;
+esac
+
+log "Pipeline completed successfully"
