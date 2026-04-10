@@ -5,7 +5,7 @@ homelab_core_healthcheck_status: 200
 # Memos stack settings (v1: direct host port, no reverse proxy).
 memos_app_dir: /opt/memos
 memos_data_dir: /opt/memos/data
-memos_healthcheck_url: http://127.0.0.1:5230/api/v1/status
+memos_healthcheck_url: http://127.0.0.1:5230
 memos_healthcheck_status: 200
 
 # Journiv stack settings (v1: direct host port, no reverse proxy).
