@@ -2,6 +2,7 @@
 - name: Deploy minimal compose stack to homelab-core
   hosts: homelab_core
   gather_facts: false
+  become: true
   vars_files:
     - ../group_vars/all.yml
     - ../group_vars/homelab_core.yml
