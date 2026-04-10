@@ -1,85 +1,67 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROLE="${1:-}"
+ROLE="${1:-homelab-core}"
+REPO_URL="https://github.com/berna465/homelab-stack.git"
+REPO_DIR="/opt/homelab-stack"
+TARGET_DIR="/opt/homelab-core"
 
-if [[ -z "${ROLE}" ]]; then
-  echo "Uso: scripts/bootstrap-node.sh <infra|apps>"
+if [[ "${ROLE}" != "homelab-core" ]]; then
+  echo "Uso: scripts/bootstrap-node.sh [homelab-core]" >&2
   exit 1
 fi
 
-# Repo in sola lettura via HTTPS (niente chiavi SSH necessarie)
-REPO_URL="https://github.com/berna465/homelab-stack.git"
-REPO_DIR="/opt/homelab-stack"
+log() {
+  printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"
+}
 
-echo "==> Aggiorno pacchetti..."
+require_cmd() {
+  command -v "$1" >/dev/null 2>&1 || {
+    echo "[ERROR] Missing command: $1" >&2
+    exit 1
+  }
+}
+
+log "Updating base packages"
 apt-get update -y
 apt-get upgrade -y
-
-echo "==> Installo dipendenze base..."
 apt-get install -y ca-certificates curl gnupg git
 
 if ! command -v docker >/dev/null 2>&1; then
-  echo "==> Installo Docker..."
+  log "Installing Docker"
   install -m 0755 -d /etc/apt/keyrings
-  curl -fsSL https://download.docker.com/linux/debian/gpg | \
-    gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+  curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
   chmod a+r /etc/apt/keyrings/docker.gpg
 
   . /etc/os-release
-  echo \
-    "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
-https://download.docker.com/linux/debian ${VERSION_CODENAME} stable" \
-    > /etc/apt/sources.list.d/docker.list
-
+  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian ${VERSION_CODENAME} stable" > /etc/apt/sources.list.d/docker.list
   apt-get update -y
-  apt-get install -y docker-ce docker-ce-cli containerd.io \
-    docker-buildx-plugin docker-compose-plugin
+  apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 fi
 
-echo "==> Assicuro l'utente 'bernardo' nel gruppo docker (se esiste)..."
-if id bernardo >/dev/null 2>&1; then
-  usermod -aG docker bernardo
-fi
-
-echo "==> Clono o aggiorno il repository ${REPO_URL}..."
+log "Cloning/updating repository via HTTPS"
 if [[ ! -d "${REPO_DIR}" ]]; then
   git clone "${REPO_URL}" "${REPO_DIR}"
 else
-  cd "${REPO_DIR}"
-  git pull
+  git -C "${REPO_DIR}" pull --ff-only
 fi
 
-cd "${REPO_DIR}"
+require_cmd docker
 
-echo "==> Creo rete Docker 'proxy' se non esiste..."
-if ! docker network ls --format '{{.Name}}' | grep -q '^proxy$'; then
-  docker network create proxy
-fi
+[[ -f "${REPO_DIR}/docker/homelab-core/docker-compose.yml" ]] || { echo "[ERROR] Missing compose file" >&2; exit 1; }
+[[ -f "${REPO_DIR}/scripts/docker/healthcheck.sh" ]] || { echo "[ERROR] Missing healthcheck script" >&2; exit 1; }
+[[ -f "${REPO_DIR}/secrets/homelab-core.env" ]] || { echo "[ERROR] Missing secrets/homelab-core.env" >&2; exit 1; }
 
-case "${ROLE}" in
-  infra)
-    echo "==> Bootstrap ruolo: infra-core"
-    if [[ ! -f config/secrets/.env.infra-core ]]; then
-      echo "ERRORE: manca config/secrets/.env.infra-core"
-      exit 1
-    fi
-    cd stacks/infra-core
-    docker compose pull
-    docker compose up -d
-    ;;
-  apps)
-    echo "==> Bootstrap ruolo: apps-core"
-    if [[ ! -f config/secrets/.env.apps-core ]]; then
-      echo "ERRORE: manca config/secrets/.env.apps-core"
-      exit 1
-    fi
-    cd stacks/apps-core
-    docker compose pull
-    docker compose up -d
-    ;;
-  *)
-    echo "Ruolo sconosciuto: ${ROLE}"
-    exit 1
-    ;;
-esac
+log "Installing homelab-core stack files"
+mkdir -p "${TARGET_DIR}"
+install -m 0644 "${REPO_DIR}/docker/homelab-core/docker-compose.yml" "${TARGET_DIR}/docker-compose.yml"
+install -m 0644 "${REPO_DIR}/docker/homelab-core/.env.example" "${TARGET_DIR}/.env.example"
+install -m 0755 "${REPO_DIR}/scripts/docker/healthcheck.sh" "${TARGET_DIR}/healthcheck.sh"
+install -m 0600 "${REPO_DIR}/secrets/homelab-core.env" "${TARGET_DIR}/.env"
+
+log "Deploying docker compose stack"
+cd "${TARGET_DIR}"
+docker compose --env-file .env up -d
+"${TARGET_DIR}/healthcheck.sh"
+
+log "Bootstrap complete"

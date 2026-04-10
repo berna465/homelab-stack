@@ -160,23 +160,37 @@ LOCAL_SECRETS_FILE="${ROOT_DIR}/secrets/homelab-core.env"
 
 [[ -f "${LOCAL_SECRETS_FILE}" ]] || fail "Missing secrets file: ${LOCAL_SECRETS_FILE}"
 
-REMOTE_USER="${VM_CIUSER}"
-if ! ssh "${SSH_OPTS[@]}" "${REMOTE_USER}@${VM_SSH_HOST}" "true" >/dev/null 2>&1; then
-  for fallback_user in "${TEMPLATE_CIUSER:-}" ubuntu debian; do
-    [[ -n "${fallback_user}" ]] || continue
-    if ssh "${SSH_OPTS[@]}" "${fallback_user}@${VM_SSH_HOST}" "true" >/dev/null 2>&1; then
-      log "SSH login with ${VM_CIUSER} failed; falling back to ${fallback_user}"
-      REMOTE_USER="${fallback_user}"
-      break
+resolve_remote_user() {
+  local candidate
+  for candidate in "${VM_CIUSER}" "${TEMPLATE_CIUSER:-}" ubuntu debian; do
+    [[ -n "${candidate}" ]] || continue
+    if ssh "${SSH_OPTS[@]}" "${candidate}@${VM_SSH_HOST}" "true" >/dev/null 2>&1; then
+      echo "${candidate}"
+      return 0
     fi
   done
+  return 1
+}
 
-  if [[ "${REMOTE_USER}" == "${VM_CIUSER}" ]]; then
-    fail "SSH authentication failed for VM_CIUSER='${VM_CIUSER}'. Check ciuser and SSH key."
+REMOTE_USER=""
+for _ in $(seq 1 45); do
+  if REMOTE_USER="$(resolve_remote_user)"; then
+    break
   fi
+  sleep 2
+done
+
+[[ -n "${REMOTE_USER}" ]] || fail "SSH authentication failed. Cloud-init may still be applying keys or ciuser is wrong."
+if [[ "${REMOTE_USER}" != "${VM_CIUSER}" ]]; then
+  log "SSH login with ${VM_CIUSER} failed; using ${REMOTE_USER}"
 fi
 
 REMOTE_TARGET="${REMOTE_USER}@${VM_SSH_HOST}"
+
+if [[ "${SKIP_DEPLOY:-0}" == "1" ]]; then
+  log "SKIP_DEPLOY=1 set; provisioning finished without docker deployment"
+  exit 0
+fi
 
 log "Copying Docker stack artifacts to VM"
 ssh "${SSH_OPTS[@]}" "${REMOTE_TARGET}" "mkdir -p '${REMOTE_TMP_DIR}'"
