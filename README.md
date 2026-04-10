@@ -21,11 +21,28 @@ docker/
     .env.example
 scripts/
   proxmox/
+    build_template.sh     # builds Debian/Ubuntu cloud template
     stack.sh              # main entrypoint
   docker/
     deploy_stack.sh
     healthcheck.sh
 ```
+
+
+## Build hardened template (Debian/Ubuntu)
+
+Create or refresh Proxmox template VM (`TEMPLATE_ID`, default `902`) from official cloud images:
+
+```bash
+# Debian 12 template
+bash scripts/proxmox/build_template.sh
+
+# Ubuntu 24.04 template
+TEMPLATE_OS=ubuntu TEMPLATE_ID=903 TEMPLATE_NAME=ubuntu24-cloud-template \
+  bash scripts/proxmox/build_template.sh
+```
+
+To recreate an existing template VMID, set `FORCE_RECREATE=1`.
 
 ## 1) Configure values
 

@@ -118,6 +118,11 @@ fi
 
 log "Waiting for SSH on ${VM_SSH_HOST}:${VM_SSH_PORT}"
 for _ in $(seq 1 90); do
+  vm_runtime_status="$(qm status "${VM_ID}" | awk '{print $2}')"
+  if [[ "${vm_runtime_status}" == "stopped" ]]; then
+    fail "VM ${VM_ID} stopped unexpectedly before SSH became reachable (possible kernel panic/template issue)"
+  fi
+
   if nc -z "${VM_SSH_HOST}" "${VM_SSH_PORT}" >/dev/null 2>&1; then
     log "SSH port is reachable"
     break
