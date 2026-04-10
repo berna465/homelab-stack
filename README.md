@@ -20,6 +20,7 @@ docker/
     docker-compose.yml
     .env.example
 scripts/
+  run-homelab.sh          # pipeline entrypoint (template + stack)
   proxmox/
     build_template.sh     # builds Debian/Ubuntu cloud template
     stack.sh              # main entrypoint
@@ -66,7 +67,14 @@ Create/update local secret file:
 From the Proxmox host (or a machine that can run `qm` and SSH to the VM):
 
 ```bash
-bash scripts/proxmox/stack.sh
+# Full pipeline (recommended): build template + provision/deploy stack
+bash scripts/run-homelab.sh all
+
+# Only template
+bash scripts/run-homelab.sh template
+
+# Only VM + deploy
+bash scripts/run-homelab.sh stack
 ```
 
 ## What `stack.sh` does
