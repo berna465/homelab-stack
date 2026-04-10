@@ -33,3 +33,7 @@ vm_data_subdirectories:
   - journiv
   - bookstack
 
+
+# Root disk sizing for container image pulls and runtime overhead.
+vm_root_disk_slot: scsi0
+vm_root_disk_size_gb: 16

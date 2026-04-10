@@ -11,5 +11,8 @@ memos_healthcheck_status: 200
 # Journiv stack settings (v1: direct host port, no reverse proxy).
 journiv_app_dir: /opt/journiv
 journiv_data_dir: /opt/journiv/data
+journiv_image: swalabtech/journiv-app:latest
+journiv_app_user_fallback_uid: 1000
+journiv_app_user_fallback_gid: 1000
 journiv_healthcheck_url: http://127.0.0.1:8010/
 journiv_healthcheck_status: 200
