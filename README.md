@@ -44,6 +44,13 @@ TEMPLATE_OS=ubuntu TEMPLATE_ID=903 TEMPLATE_NAME=ubuntu24-cloud-template \
 
 To recreate an existing template VMID, set `FORCE_RECREATE=1`.
 
+If a template keeps failing at first boot, recreate it from scratch:
+
+```bash
+rm -f /var/lib/vz/template/qemu/debian-12-genericcloud-amd64.qcow2
+FORCE_RECREATE=1 TEMPLATE_OS=debian TEMPLATE_ID=902 bash scripts/proxmox/build_template.sh
+```
+
 ## 1) Configure values
 
 Edit:

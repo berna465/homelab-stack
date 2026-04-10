@@ -27,6 +27,7 @@ source "${CONFIG_FILE}"
 require_cmd qm
 require_cmd pvesm
 require_cmd wget
+require_cmd qemu-img
 
 TEMPLATE_OS="${TEMPLATE_OS:-debian}"
 TEMPLATE_ID="${TEMPLATE_ID:-902}"
@@ -83,12 +84,9 @@ fi
 cat > "${SNIPPET_PATH}" <<YAML
 #cloud-config
 package_update: true
-package_upgrade: true
+package_upgrade: false
 packages:
   - qemu-guest-agent
-  - fail2ban
-  - unattended-upgrades
-  - apt-listchanges
 ssh_pwauth: false
 disable_root: true
 users:
@@ -98,13 +96,17 @@ users:
     shell: /bin/bash
 runcmd:
   - systemctl enable --now qemu-guest-agent
-  - systemctl enable --now unattended-upgrades
   - timedatectl set-timezone UTC
 YAML
+
+log "Validating cloud image format"
+qemu-img info "${IMAGE_PATH}" >/dev/null
 
 log "Creating VM ${TEMPLATE_ID} (${TEMPLATE_NAME})"
 qm create "${TEMPLATE_ID}" \
   --name "${TEMPLATE_NAME}" \
+  --ostype l26 \
+  --cpu host \
   --memory "${TEMPLATE_MEMORY_MB}" \
   --cores "${TEMPLATE_CORES}" \
   --net0 "virtio,bridge=${TEMPLATE_BRIDGE}" \
