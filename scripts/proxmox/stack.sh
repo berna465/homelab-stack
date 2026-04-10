@@ -97,14 +97,34 @@ qm set "${VM_ID}" \
   --ipconfig0 "ip=${VM_IP_CIDR},gw=${VM_GATEWAY}" \
   --agent 1
 
-current_disk_gb="$(qm config "${VM_ID}" | awk -F'size=' '/^scsi0:/ {gsub(/G.*/,"",$2); print $2; exit}')"
-requested_disk_gb="${VM_DISK_SIZE%G}"
+to_mb() {
+  local size="$1"
+  size="${size^^}"
+  if [[ "${size}" =~ ^([0-9]+)([TGMK])$ ]]; then
+    local value="${BASH_REMATCH[1]}"
+    local unit="${BASH_REMATCH[2]}"
+    case "${unit}" in
+      T) echo $(( value * 1024 * 1024 )) ;;
+      G) echo $(( value * 1024 )) ;;
+      M) echo "${value}" ;;
+      K) echo $(( value / 1024 )) ;;
+    esac
+  else
+    fail "Unsupported disk size format: ${size}"
+  fi
+}
 
-if [[ -n "${current_disk_gb}" ]] && (( requested_disk_gb > current_disk_gb )); then
-  log "Resizing disk from ${current_disk_gb}G to ${requested_disk_gb}G"
+current_disk_raw="$(qm config "${VM_ID}" | awk -F'size=' '/^scsi0:/ {split($2,a,","); print a[1]; exit}')"
+requested_disk_raw="${VM_DISK_SIZE^^}"
+
+current_disk_mb="$(to_mb "${current_disk_raw}")"
+requested_disk_mb="$(to_mb "${requested_disk_raw}")"
+
+if (( requested_disk_mb > current_disk_mb )); then
+  log "Resizing disk from ${current_disk_raw} to ${requested_disk_raw}"
   qm resize "${VM_ID}" scsi0 "${VM_DISK_SIZE}"
 else
-  log "Disk resize not needed (current: ${current_disk_gb:-unknown}G, requested: ${requested_disk_gb}G)"
+  log "Disk resize not needed (current: ${current_disk_raw:-unknown}, requested: ${requested_disk_raw})"
 fi
 
 vm_status="$(qm status "${VM_ID}" | awk '{print $2}')"
@@ -136,10 +156,27 @@ fi
 
 REMOTE_TMP_DIR="/tmp/homelab-stack"
 REMOTE_APP_DIR="${REMOTE_APP_DIR:-/home/${VM_CIUSER}/homelab-core}"
-REMOTE_TARGET="${VM_CIUSER}@${VM_SSH_HOST}"
 LOCAL_SECRETS_FILE="${ROOT_DIR}/secrets/homelab-core.env"
 
 [[ -f "${LOCAL_SECRETS_FILE}" ]] || fail "Missing secrets file: ${LOCAL_SECRETS_FILE}"
+
+REMOTE_USER="${VM_CIUSER}"
+if ! ssh "${SSH_OPTS[@]}" "${REMOTE_USER}@${VM_SSH_HOST}" "true" >/dev/null 2>&1; then
+  for fallback_user in "${TEMPLATE_CIUSER:-}" ubuntu debian; do
+    [[ -n "${fallback_user}" ]] || continue
+    if ssh "${SSH_OPTS[@]}" "${fallback_user}@${VM_SSH_HOST}" "true" >/dev/null 2>&1; then
+      log "SSH login with ${VM_CIUSER} failed; falling back to ${fallback_user}"
+      REMOTE_USER="${fallback_user}"
+      break
+    fi
+  done
+
+  if [[ "${REMOTE_USER}" == "${VM_CIUSER}" ]]; then
+    fail "SSH authentication failed for VM_CIUSER='${VM_CIUSER}'. Check ciuser and SSH key."
+  fi
+fi
+
+REMOTE_TARGET="${REMOTE_USER}@${VM_SSH_HOST}"
 
 log "Copying Docker stack artifacts to VM"
 ssh "${SSH_OPTS[@]}" "${REMOTE_TARGET}" "mkdir -p '${REMOTE_TMP_DIR}'"
