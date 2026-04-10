@@ -1,0 +1,44 @@
+---
+- name: Deploy memos stack to homelab-core
+  hosts: homelab_core
+  gather_facts: false
+  become: true
+  vars_files:
+    - ../group_vars/all.yml
+    - ../group_vars/homelab_core.yml
+
+  tasks:
+    - name: Ensure memos application directory exists
+      ansible.builtin.file:
+        path: "{{ memos_app_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Ensure memos data directory exists
+      ansible.builtin.file:
+        path: "{{ memos_data_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Copy memos docker-compose definition
+      ansible.builtin.copy:
+        src: ../files/homelab-core/memos/docker-compose.yml
+        dest: "{{ memos_app_dir }}/docker-compose.yml"
+        mode: '0644'
+
+    - name: Copy memos environment file
+      ansible.builtin.copy:
+        src: ../files/homelab-core/memos/.env.example
+        dest: "{{ memos_app_dir }}/.env"
+        mode: '0644'
+
+    - name: Start memos service with docker compose
+      ansible.builtin.command: docker compose up -d
+      args:
+        chdir: "{{ memos_app_dir }}"
+
+    - name: Verify memos health endpoint returns 200
+      ansible.builtin.uri:
+        url: "{{ memos_healthcheck_url }}"
+        status_code: "{{ memos_healthcheck_status }}"
+        return_content: false
