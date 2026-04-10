@@ -20,7 +20,9 @@ docker/
     docker-compose.yml
     .env.example
 scripts/
-  run-homelab.sh          # pipeline entrypoint (template + stack)
+  run-homelab.sh          # pipeline entrypoint
+  provision-vms.sh        # provision VM(s) only
+  bootstrap-node.sh       # bootstrap node software via HTTPS repo
   proxmox/
     build_template.sh     # builds Debian/Ubuntu cloud template
     stack.sh              # provision + deploy
@@ -68,13 +70,19 @@ Create/update local secret file:
 From the Proxmox host (or a machine that can run `qm` and SSH to the VM):
 
 ```bash
-# Full pipeline (recommended): build template + provision/deploy stack
+# Full pipeline (recommended): build template -> provision -> bootstrap
 bash scripts/run-homelab.sh all
 
 # Only template
 bash scripts/run-homelab.sh template
 
-# Only VM + deploy
+# Only VM provisioning
+bash scripts/run-homelab.sh provision
+
+# Only node bootstrap
+bash scripts/run-homelab.sh bootstrap
+
+# Legacy one-shot flow
 bash scripts/run-homelab.sh stack
 
 # Destroy resources
@@ -104,3 +112,4 @@ Default deploy path is the VM user home (`/home/<ciuser>/homelab-core`) to avoid
 - Idempotency: safe to rerun; existing VM is not recreated.
 - For Ubuntu templates, set `VM_CIUSER=ubuntu` (or let `stack.sh` fallback to `ubuntu` automatically if SSH key login for the configured user fails).
 - Remote deploy now auto-detects whether to run `docker compose` directly or through passwordless `sudo` when socket permissions require it.
+- `bootstrap-node.sh` uses HTTPS repository clone/pull (`https://github.com/berna465/homelab-stack.git`).

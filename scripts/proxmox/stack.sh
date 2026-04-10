@@ -187,6 +187,11 @@ fi
 
 REMOTE_TARGET="${REMOTE_USER}@${VM_SSH_HOST}"
 
+if [[ "${SKIP_DEPLOY:-0}" == "1" ]]; then
+  log "SKIP_DEPLOY=1 set; provisioning finished without docker deployment"
+  exit 0
+fi
+
 log "Copying Docker stack artifacts to VM"
 ssh "${SSH_OPTS[@]}" "${REMOTE_TARGET}" "mkdir -p '${REMOTE_TMP_DIR}'"
 scp "${SCP_OPTS[@]}" \
