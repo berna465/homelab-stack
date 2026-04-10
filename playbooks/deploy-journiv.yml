@@ -25,6 +25,33 @@
         - "{{ journiv_data_dir }}/postgres"
         - "{{ journiv_data_dir }}/valkey"
 
+    - name: Show Journiv app uid/gid used for host directory permissions
+      ansible.builtin.debug:
+        msg: >-
+          Using uid={{ journiv_app_uid }} gid={{ journiv_app_gid }}
+          for {{ journiv_data_dir }}/app ownership.
+
+    - name: Ensure journiv app writable subdirectories exist
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ journiv_app_uid }}"
+        group: "{{ journiv_app_gid }}"
+        mode: '0775'
+      loop:
+        - "{{ journiv_data_dir }}/app"
+        - "{{ journiv_data_dir }}/app/media"
+        - "{{ journiv_data_dir }}/app/logs"
+
+    - name: Ensure journiv app data tree ownership and permissions are correct
+      ansible.builtin.file:
+        path: "{{ journiv_data_dir }}/app"
+        state: directory
+        owner: "{{ journiv_app_uid }}"
+        group: "{{ journiv_app_gid }}"
+        mode: '0775'
+        recurse: true
+
     - name: Copy journiv docker-compose definition
       ansible.builtin.copy:
         src: ../files/homelab-core/journiv/docker-compose.yml
