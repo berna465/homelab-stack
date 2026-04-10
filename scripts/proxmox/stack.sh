@@ -70,6 +70,23 @@ else
   qm clone "${PVE_TEMPLATE_ID}" "${VM_ID}" --name "${VM_NAME}" --target "${PVE_NODE_NAME}" --full 1 --storage "${PVE_STORAGE}"
 fi
 
+pre_config_status="$(qm status "${VM_ID}" | awk '{print $2}')"
+if [[ "${pre_config_status}" == "running" ]]; then
+  log "VM ${VM_ID} is running; stopping it to avoid hotplug errors during qm set"
+  qm shutdown "${VM_ID}" --timeout 60 || true
+
+  for _ in $(seq 1 30); do
+    current_status="$(qm status "${VM_ID}" | awk '{print $2}')"
+    [[ "${current_status}" == "stopped" ]] && break
+    sleep 2
+  done
+
+  if [[ "$(qm status "${VM_ID}" | awk '{print $2}')" != "stopped" ]]; then
+    log "Graceful shutdown timed out; forcing stop"
+    qm stop "${VM_ID}"
+  fi
+fi
+
 log "Applying VM configuration"
 qm set "${VM_ID}" \
   --cores "${VM_CORES}" \

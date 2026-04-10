@@ -16,22 +16,18 @@ require_file() {
   }
 }
 
-resolve_docker_compose_cmd() {
-  # `docker compose version` can succeed even when daemon socket access is denied.
-  # Check daemon access explicitly with `docker info`.
-  if docker info >/dev/null 2>&1; then
-    echo "docker compose"
+compose_cmd() {
+  if docker compose "$@"; then
     return 0
   fi
 
-  if command -v sudo >/dev/null 2>&1 && sudo -n docker info >/dev/null 2>&1; then
-    echo "sudo docker compose"
+  if command -v sudo >/dev/null 2>&1 && sudo -n docker compose "$@"; then
     return 0
   fi
 
-  printf '[ERROR] Docker daemon is not accessible for user %s.\n' "$(id -un)" >&2
-  printf '[ERROR] Use a user in docker group or configure passwordless sudo for docker commands.\n' >&2
-  exit 1
+  printf '[ERROR] Docker compose failed both as user (%s) and via passwordless sudo.\n' "$(id -un)" >&2
+  printf '[ERROR] Configure docker group membership or passwordless sudo for docker.\n' >&2
+  return 1
 }
 
 require_file "${SOURCE_DIR}/docker-compose.yml"
@@ -46,12 +42,8 @@ install -m 0600 "${SOURCE_DIR}/homelab-core.env" "${TARGET_DIR}/.env"
 
 cd "${TARGET_DIR}"
 
-DOCKER_COMPOSE_CMD="$(resolve_docker_compose_cmd)"
-export DOCKER_COMPOSE_CMD
-
 log "Starting docker compose stack"
-# shellcheck disable=SC2086
-${DOCKER_COMPOSE_CMD} --env-file .env up -d
+compose_cmd --env-file .env up -d
 
 log "Running stack healthcheck"
 "${TARGET_DIR}/healthcheck.sh"
