@@ -97,6 +97,30 @@ build_ssh_opts() {
   )
 }
 
+assert_key_usable_for_ssh() {
+  local private_key="$1"
+  local public_key="$2"
+  local expected_public
+  local derived_public
+  local agent_keys=""
+
+  expected_public="$(awk '{print $1" "$2}' "${public_key}")"
+  derived_public="$(ssh-keygen -y -f "${private_key}" 2>/dev/null || true)"
+
+  if [[ "${derived_public}" == "${expected_public}" ]]; then
+    return 0
+  fi
+
+  if command -v ssh-add >/dev/null 2>&1; then
+    agent_keys="$(ssh-add -L 2>/dev/null || true)"
+    if [[ -n "${agent_keys}" && "${agent_keys}" == *"${expected_public}"* ]]; then
+      return 0
+    fi
+  fi
+
+  fail "SSH key ${private_key} is not usable non-interactively. If it has a passphrase, load it with ssh-agent (ssh-add) or use a non-passphrase automation key."
+}
+
 resolve_remote_user() {
   local host="$1"
   local candidate
@@ -125,6 +149,7 @@ run_remote_bootstrap() {
   if [[ "${key}" != "${preferred_key}" ]]; then
     log "VM_SSH_PRIVATE_KEY_FILE does not match ${pubkey}; using detected private key ${key}"
   fi
+  assert_key_usable_for_ssh "${key}" "${pubkey}"
   build_ssh_opts "${key}" "${port}"
 
   log "Waiting for SSH port on ${host}:${port}"
