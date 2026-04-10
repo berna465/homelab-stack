@@ -36,15 +36,36 @@ require_cmd() {
   command -v "$1" >/dev/null 2>&1 || fail "Missing required command: $1"
 }
 
+build_ssh_opts() {
+  local key="$1"
+  local port="$2"
+  SSH_OPTS=(
+    -i "${key}"
+    -o StrictHostKeyChecking=no
+    -o UserKnownHostsFile=/dev/null
+    -o BatchMode=yes
+    -o ConnectTimeout=3
+    -o ConnectionAttempts=1
+    -o PreferredAuthentications=publickey
+    -p "${port}"
+  )
+  SCP_OPTS=(
+    -i "${key}"
+    -o StrictHostKeyChecking=no
+    -o UserKnownHostsFile=/dev/null
+    -o ConnectTimeout=3
+    -o ConnectionAttempts=1
+    -P "${port}"
+  )
+}
+
 resolve_remote_user() {
   local host="$1"
-  local key="$2"
-  local port="$3"
   local candidate
-  local opts=(-i "${key}" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p "${port}")
+
   for candidate in "${VM_CIUSER}" "${TEMPLATE_CIUSER:-}" ubuntu debian; do
     [[ -n "${candidate}" ]] || continue
-    if ssh "${opts[@]}" "${candidate}@${host}" "true" >/dev/null 2>&1; then
+    if ssh "${SSH_OPTS[@]}" "${candidate}@${host}" "true" >/dev/null 2>&1; then
       echo "${candidate}"
       return 0
     fi
@@ -59,24 +80,29 @@ run_remote_bootstrap() {
   local user=""
 
   [[ -f "${key}" ]] || fail "SSH private key not found: ${key}"
+  build_ssh_opts "${key}" "${port}"
 
-  for _ in $(seq 1 45); do
-    if user="$(resolve_remote_user "${host}" "${key}" "${port}")"; then
+  log "Waiting for SSH key authentication on ${host}:${port}"
+  for attempt in $(seq 1 120); do
+    if user="$(resolve_remote_user "${host}")"; then
       break
+    fi
+
+    if (( attempt % 10 == 0 )); then
+      log "Still waiting for SSH auth (${attempt}/120)"
     fi
     sleep 2
   done
 
-  [[ -n "${user}" ]] || fail "Unable to authenticate on ${host} for bootstrap"
+  [[ -n "${user}" ]] || fail "Unable to authenticate on ${host} for bootstrap. Check VM_CIUSER, SSH key pair, and cloud-init status."
 
   local target="${user}@${host}"
-  local ssh_opts=(-i "${key}" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p "${port}")
 
   log "Copying bootstrap-node.sh to ${target}"
-  scp "${ssh_opts[@]}" "${BOOTSTRAP_SCRIPT}" "${target}:/tmp/bootstrap-node.sh"
+  scp "${SCP_OPTS[@]}" "${BOOTSTRAP_SCRIPT}" "${target}:/tmp/bootstrap-node.sh"
 
   log "Running bootstrap-node.sh remotely"
-  ssh "${ssh_opts[@]}" "${target}" "chmod +x /tmp/bootstrap-node.sh && (sudo -n bash /tmp/bootstrap-node.sh homelab-core || bash /tmp/bootstrap-node.sh homelab-core)"
+  ssh "${SSH_OPTS[@]}" "${target}" "chmod +x /tmp/bootstrap-node.sh && (sudo -n bash /tmp/bootstrap-node.sh homelab-core || bash /tmp/bootstrap-node.sh homelab-core)"
 }
 
 COMMAND="${1:-all}"
