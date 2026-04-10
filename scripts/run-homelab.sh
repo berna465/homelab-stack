@@ -36,21 +36,39 @@ require_cmd() {
   command -v "$1" >/dev/null 2>&1 || fail "Missing required command: $1"
 }
 
-validate_ssh_key_pair() {
-  local private_key="$1"
+resolve_private_key_for_public() {
   local public_key="$2"
-  local derived_public
+  local preferred_private_key="$1"
+  local candidate
+  local candidates=()
   local expected_public
 
-  [[ -f "${private_key}" ]] || fail "SSH private key not found: ${private_key}"
   [[ -f "${public_key}" ]] || fail "SSH public key not found: ${public_key}"
-
-  derived_public="$(ssh-keygen -y -f "${private_key}" 2>/dev/null)" || fail "Unable to read SSH private key: ${private_key}"
   expected_public="$(awk '{print $1" "$2}' "${public_key}")"
 
-  if [[ "${derived_public}" != "${expected_public}" ]]; then
-    fail "Configured SSH key pair mismatch: ${private_key} does not match ${public_key}"
+  if [[ -n "${preferred_private_key}" ]]; then
+    candidates+=("${preferred_private_key}")
   fi
+  candidates+=("${HOME}/.ssh/id_ed25519" "${HOME}/.ssh/id_rsa" "${HOME}/.ssh/id_ecdsa")
+  shopt -s nullglob
+  for candidate in "${HOME}"/.ssh/id_*; do
+    [[ "${candidate}" == *.pub ]] && continue
+    candidates+=("${candidate}")
+  done
+  shopt -u nullglob
+
+  for candidate in "${candidates[@]}"; do
+    [[ -f "${candidate}" ]] || continue
+    if [[ "$(ssh-keygen -y -f "${candidate}" 2>/dev/null || true)" == "${expected_public}" ]]; then
+      echo "${candidate}"
+      return 0
+    fi
+  done
+
+  if [[ -n "${preferred_private_key}" && -f "${preferred_private_key}" ]]; then
+    fail "Configured SSH key pair mismatch: ${preferred_private_key} does not match ${public_key}, and no matching private key was found in ${HOME}/.ssh"
+  fi
+  fail "No private key found in ${HOME}/.ssh matching ${public_key}"
 }
 
 build_ssh_opts() {
@@ -93,13 +111,17 @@ resolve_remote_user() {
 run_remote_bootstrap() {
   local host="${VM_SSH_HOST:-${VM_IP_CIDR%%/*}}"
   local port="${VM_SSH_PORT:-22}"
-  local key="${VM_SSH_PRIVATE_KEY_FILE:-${HOME}/.ssh/id_rsa}"
-  local pubkey="${VM_SSH_PUBLIC_KEY_FILE:-${HOME}/.ssh/id_rsa.pub}"
+  local preferred_key="${SSH_PRIVATE_KEY_FILE:-${VM_SSH_PRIVATE_KEY_FILE:-${HOME}/.ssh/id_rsa}}"
+  local key=""
+  local pubkey="${SSH_PUBLIC_KEY_FILE:-${VM_SSH_PUBLIC_KEY_FILE:-${HOME}/.ssh/id_rsa.pub}}"
   local user=""
   local attempted_users=()
   local candidate
 
-  validate_ssh_key_pair "${key}" "${pubkey}"
+  key="$(resolve_private_key_for_public "${preferred_key}" "${pubkey}")"
+  if [[ "${key}" != "${preferred_key}" ]]; then
+    log "VM_SSH_PRIVATE_KEY_FILE does not match ${pubkey}; using detected private key ${key}"
+  fi
   build_ssh_opts "${key}" "${port}"
 
   log "Waiting for SSH port on ${host}:${port}"
@@ -150,6 +172,9 @@ DESTROY_TARGET="${2:-vm}"
 [[ -f "${CONFIG_FILE}" ]] || fail "Configuration file not found: ${CONFIG_FILE}"
 # shellcheck disable=SC1090
 source "${CONFIG_FILE}"
+
+SSH_PUBLIC_KEY_FILE="${SSH_PUBLIC_KEY_FILE:-${VM_SSH_PUBLIC_KEY_FILE:-${HOME}/.ssh/id_rsa.pub}}"
+SSH_PRIVATE_KEY_FILE="${SSH_PRIVATE_KEY_FILE:-${VM_SSH_PRIVATE_KEY_FILE:-${HOME}/.ssh/id_rsa}}"
 
 [[ -x "${BUILD_TEMPLATE_SCRIPT}" ]] || fail "Template builder not executable: ${BUILD_TEMPLATE_SCRIPT}"
 [[ -x "${PROVISION_SCRIPT}" ]] || fail "Provision script not executable: ${PROVISION_SCRIPT}"

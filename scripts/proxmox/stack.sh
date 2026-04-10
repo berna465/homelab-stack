@@ -42,21 +42,23 @@ required_vars=(
   VM_IP_CIDR
   VM_GATEWAY
   VM_CIUSER
-  VM_SSH_PUBLIC_KEY_FILE
 )
 
 for var_name in "${required_vars[@]}"; do
   require_var "${var_name}"
 done
 
-[[ -f "${VM_SSH_PUBLIC_KEY_FILE}" ]] || fail "SSH public key file not found: ${VM_SSH_PUBLIC_KEY_FILE}"
+SSH_PUBLIC_KEY_FILE="${SSH_PUBLIC_KEY_FILE:-${VM_SSH_PUBLIC_KEY_FILE:-${HOME}/.ssh/id_rsa.pub}}"
+SSH_PRIVATE_KEY_FILE="${SSH_PRIVATE_KEY_FILE:-${VM_SSH_PRIVATE_KEY_FILE:-${HOME}/.ssh/id_rsa}}"
+
+[[ -f "${SSH_PUBLIC_KEY_FILE}" ]] || fail "SSH public key file not found: ${SSH_PUBLIC_KEY_FILE}"
+[[ -f "${SSH_PRIVATE_KEY_FILE}" ]] || fail "SSH private key file not found: ${SSH_PRIVATE_KEY_FILE}"
 
 VM_IP="${VM_IP_CIDR%%/*}"
 VM_SSH_HOST="${VM_SSH_HOST:-$VM_IP}"
 VM_SSH_PORT="${VM_SSH_PORT:-22}"
-VM_SSH_PRIVATE_KEY_FILE="${VM_SSH_PRIVATE_KEY_FILE:-${HOME}/.ssh/id_rsa}"
-SSH_OPTS=(-i "${VM_SSH_PRIVATE_KEY_FILE}" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p "${VM_SSH_PORT}")
-SCP_OPTS=(-i "${VM_SSH_PRIVATE_KEY_FILE}" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -P "${VM_SSH_PORT}")
+SSH_OPTS=(-i "${SSH_PRIVATE_KEY_FILE}" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p "${VM_SSH_PORT}")
+SCP_OPTS=(-i "${SSH_PRIVATE_KEY_FILE}" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -P "${VM_SSH_PORT}")
 
 require_cmd qm
 require_cmd ssh
@@ -93,7 +95,7 @@ qm set "${VM_ID}" \
   --memory "${VM_MEMORY_MB}" \
   --net0 "virtio,bridge=${VM_BRIDGE}" \
   --ciuser "${VM_CIUSER}" \
-  --sshkey "${VM_SSH_PUBLIC_KEY_FILE}" \
+  --sshkey "${SSH_PUBLIC_KEY_FILE}" \
   --ipconfig0 "ip=${VM_IP_CIDR},gw=${VM_GATEWAY}" \
   --agent 1
 
