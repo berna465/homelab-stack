@@ -5,3 +5,4 @@
 - Do not refactor unrelated files.
 - Preserve `become: true` in deploy playbooks where `/opt/...` is used.
 - Do not modify provisioning logic unless explicitly asked.
+- For app stacks with persistent/local database data, prefer paths under `/data/...` (dedicated data disk) over root-disk-heavy paths.

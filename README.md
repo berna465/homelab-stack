@@ -8,6 +8,7 @@ Current validated flows:
 2. SSH into the VM
 3. Deploy independent Docker Compose stacks
 4. Verify HTTP health checks
+5. Attach and prepare a dedicated data disk for persistent app data
 
 ## Repository structure
 
@@ -23,14 +24,16 @@ homelab-stack/
 │   ├── provision.yml
 │   ├── deploy.yml                 # whoami smoke-test stack
 │   ├── deploy-memos.yml           # memos app stack
-│   └── deploy-journiv.yml         # journiv app stack
+│   ├── deploy-journiv.yml         # journiv app stack
+│   ├── attach-data-disk.yml       # attach dedicated disk in Proxmox
+│   └── prepare-data-disk.yml      # format, mount, and prepare /data
 └── files/
     └── homelab-core/
         ├── docker-compose.yml     # whoami smoke-test stack
         ├── .env.example           # whoami example env
-        └── memos/
-            ├── docker-compose.yml
-            └── .env.example
+        ├── memos/
+        │   ├── docker-compose.yml
+        │   └── .env.example
         └── journiv/
             ├── docker-compose.yml
             └── .env.example
@@ -137,6 +140,45 @@ curl -i http://192.168.178.210:8010/
 Open in browser:
 
 - `http://192.168.178.210:8010`
+
+
+### 9) Attach dedicated data disk on Proxmox
+
+```bash
+ansible-playbook playbooks/attach-data-disk.yml
+```
+
+What this playbook does:
+
+- reads VM `210` configuration from Proxmox
+- checks whether slot `scsi1` is already configured
+- attaches a new disk (default `local-lvm:40`) only when missing
+
+### 10) Prepare and mount data disk inside homelab-core
+
+```bash
+ansible-playbook playbooks/prepare-data-disk.yml
+```
+
+What this playbook does:
+
+- detects the secondary disk (or uses `vm_data_disk_device` when set)
+- creates an `ext4` filesystem when the disk is not formatted yet
+- mounts the disk persistently at `/data` using UUID in `/etc/fstab`
+- creates standard persistence directories under `/data`:
+  - `/data/apps`
+  - `/data/db`
+  - `/data/memos`
+  - `/data/journiv`
+  - `/data/bookstack`
+
+### 11) Verify mounted data disk
+
+```bash
+ansible homelab_core -b -m command -a "findmnt /data"
+ansible homelab_core -b -m command -a "df -h /data"
+ansible homelab_core -b -m command -a "ls -la /data"
+```
 
 ## Notes
 

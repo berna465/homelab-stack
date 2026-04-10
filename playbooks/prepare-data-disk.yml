@@ -1,0 +1,86 @@
+---
+- name: Prepare and mount data disk inside homelab-core
+  hosts: homelab_core
+  gather_facts: false
+  become: true
+  vars_files:
+    - ../group_vars/all.yml
+
+  tasks:
+    - name: Detect candidate data disk when device is not explicitly set
+      ansible.builtin.shell: |
+        set -euo pipefail
+        root_source="$(findmnt -n -o SOURCE /)"
+        root_parent="$(lsblk -no PKNAME "$root_source")"
+
+        for disk in $(lsblk -dn -o PATH,TYPE | awk '$2 == "disk" { print $1 }'); do
+          if [ "$disk" != "/dev/$root_parent" ]; then
+            echo "$disk"
+            exit 0
+          fi
+        done
+
+        exit 1
+      args:
+        executable: /bin/bash
+      register: detected_data_disk
+      changed_when: false
+      when: vm_data_disk_device | length == 0
+
+    - name: Set effective data disk device
+      ansible.builtin.set_fact:
+        data_disk_device_effective: >-
+          {{ vm_data_disk_device if vm_data_disk_device | length > 0 else detected_data_disk.stdout | trim }}
+
+    - name: Ensure data disk device exists
+      ansible.builtin.stat:
+        path: "{{ data_disk_device_effective }}"
+      register: data_disk_stat
+
+    - name: Fail when data disk cannot be found
+      ansible.builtin.fail:
+        msg: "Data disk device {{ data_disk_device_effective }} was not found"
+      when: not data_disk_stat.stat.exists
+
+    - name: Check existing filesystem on data disk
+      ansible.builtin.command: "blkid -s TYPE -o value {{ data_disk_device_effective }}"
+      register: data_disk_fs
+      changed_when: false
+      failed_when: false
+
+    - name: Fail when existing filesystem type does not match
+      ansible.builtin.fail:
+        msg: >-
+          Disk {{ data_disk_device_effective }} already has filesystem {{ data_disk_fs.stdout | trim }};
+          expected {{ vm_data_disk_filesystem }}.
+      when: data_disk_fs.rc == 0 and (data_disk_fs.stdout | trim) != vm_data_disk_filesystem
+
+    - name: Create filesystem on data disk when missing
+      ansible.builtin.command: "mkfs.{{ vm_data_disk_filesystem }} -F {{ data_disk_device_effective }}"
+      when: data_disk_fs.rc != 0
+
+    - name: Re-read filesystem UUID
+      ansible.builtin.command: "blkid -s UUID -o value {{ data_disk_device_effective }}"
+      register: data_disk_uuid
+      changed_when: false
+
+    - name: Ensure data mount point exists
+      ansible.builtin.file:
+        path: "{{ vm_data_mount_point }}"
+        state: directory
+        mode: '0755'
+
+    - name: Persist and mount data disk via UUID
+      ansible.posix.mount:
+        path: "{{ vm_data_mount_point }}"
+        src: "UUID={{ data_disk_uuid.stdout | trim }}"
+        fstype: "{{ vm_data_disk_filesystem }}"
+        opts: defaults
+        state: mounted
+
+    - name: Ensure standard data directories exist
+      ansible.builtin.file:
+        path: "{{ vm_data_mount_point }}/{{ item }}"
+        state: directory
+        mode: '0755'
+      loop: "{{ vm_data_subdirectories }}"
