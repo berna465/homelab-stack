@@ -17,11 +17,13 @@ require_file() {
 }
 
 compose_cmd() {
-  if docker compose "$@"; then
+  if docker ps >/dev/null 2>&1; then
+    docker compose "$@"
     return 0
   fi
 
-  if command -v sudo >/dev/null 2>&1 && sudo -n docker compose "$@"; then
+  if command -v sudo >/dev/null 2>&1 && sudo -n docker ps >/dev/null 2>&1; then
+    sudo -n docker compose "$@"
     return 0
   fi
 
