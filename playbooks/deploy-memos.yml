@@ -43,27 +43,19 @@
           Create it under /mnt/nas/backups and ensure it is writable from the VM.
       when: not memos_exports_stat.stat.exists or not memos_exports_stat.stat.isdir
 
-    - name: Verify memos NAS backups directory is writable by VM user
-      block:
-        - name: Create memos NAS backups write-test file
-          ansible.builtin.tempfile:
-            state: file
-            path: "{{ memos_exports_dir }}"
-            prefix: .ansible-write-test-
-          register: memos_backups_write_test
-          become: false
+    - name: Check memos NAS backups directory writable by VM user
+      ansible.builtin.command: "test -w {{ memos_exports_dir }}"
+      become: false
+      changed_when: false
+      failed_when: false
+      register: memos_exports_writable
 
-        - name: Remove memos NAS backups write-test file
-          ansible.builtin.file:
-            path: "{{ memos_backups_write_test.path }}"
-            state: absent
-          become: false
-      rescue:
-        - name: Fail with explicit memos NAS backups permission guidance
-          ansible.builtin.fail:
-            msg: >-
-              Required NAS backup path {{ memos_exports_dir }} is not writable by the VM SSH user ({{ ansible_user | default('unknown') }}).
-              Ensure NFS permissions allow writes for this user (or mapped UID/GID), then re-run deploy.
+    - name: Fail with explicit memos NAS backups permission guidance
+      ansible.builtin.fail:
+        msg: >-
+          Required NAS backup path {{ memos_exports_dir }} is not writable by the VM SSH user ({{ ansible_user | default('unknown') }}).
+          Ensure NFS permissions allow writes for this user (or mapped UID/GID), then re-run deploy.
+      when: memos_exports_writable.rc != 0
 
     - name: Copy memos docker-compose definition
       ansible.builtin.copy:
