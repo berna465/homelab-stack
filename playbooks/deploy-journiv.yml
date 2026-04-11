@@ -6,6 +6,20 @@
   vars_files:
     - ../group_vars/all.yml
     - ../group_vars/homelab_core.yml
+  pre_tasks:
+    - name: Load optional NAS group var and secret overrides
+      ansible.builtin.include_tasks: tasks/load-nas-overrides.yml
+      vars:
+        nas_override_var_files:
+          - "{{ nas_config_group_vars_dir }}/all.yml"
+          - "{{ nas_config_group_vars_dir }}/homelab_core.yml"
+          - "{{ nas_config_secrets_dir }}/all.yml"
+          - "{{ nas_config_secrets_dir }}/homelab_core.yml"
+
+    - name: Check optional journiv NAS env override file
+      ansible.builtin.stat:
+        path: "{{ journiv_nas_env_file }}"
+      register: journiv_nas_env_stat
 
   tasks:
     - name: Ensure journiv stack and local persistence directories exist
@@ -54,27 +68,33 @@
           Create it and ensure it is writable from the VM.
       when: not journiv_exports_stat.stat.exists or not journiv_exports_stat.stat.isdir
 
-    - name: Verify journiv NAS content directory is writable
-      ansible.builtin.copy:
-        dest: "{{ journiv_content_dir }}/.ansible-write-test"
-        content: "ok\n"
-        mode: '0644'
+    - name: Check journiv NAS content directory writable by VM user
+      ansible.builtin.command: "test -w {{ journiv_content_dir }}"
+      become: false
+      changed_when: false
+      failed_when: false
+      register: journiv_content_writable
 
-    - name: Remove journiv NAS content write-test file
-      ansible.builtin.file:
-        path: "{{ journiv_content_dir }}/.ansible-write-test"
-        state: absent
+    - name: Fail with explicit journiv NAS content permission guidance
+      ansible.builtin.fail:
+        msg: >-
+          Required NAS path {{ journiv_content_dir }} is not writable by the VM SSH user ({{ ansible_user | default('unknown') }}).
+          Ensure NFS permissions allow writes for this user (or mapped UID/GID), then re-run deploy.
+      when: journiv_content_writable.rc != 0
 
-    - name: Verify journiv NAS backups directory is writable
-      ansible.builtin.copy:
-        dest: "{{ journiv_exports_dir }}/.ansible-write-test"
-        content: "ok\n"
-        mode: '0644'
+    - name: Check journiv NAS backups directory writable by VM user
+      ansible.builtin.command: "test -w {{ journiv_exports_dir }}"
+      become: false
+      changed_when: false
+      failed_when: false
+      register: journiv_exports_writable
 
-    - name: Remove journiv NAS backups write-test file
-      ansible.builtin.file:
-        path: "{{ journiv_exports_dir }}/.ansible-write-test"
-        state: absent
+    - name: Fail with explicit journiv NAS backups permission guidance
+      ansible.builtin.fail:
+        msg: >-
+          Required NAS backup path {{ journiv_exports_dir }} is not writable by the VM SSH user ({{ ansible_user | default('unknown') }}).
+          Ensure NFS permissions allow writes for this user (or mapped UID/GID), then re-run deploy.
+      when: journiv_exports_writable.rc != 0
 
     - name: Copy journiv docker-compose definition
       ansible.builtin.copy:
@@ -82,11 +102,20 @@
         dest: "{{ journiv_app_dir }}/docker-compose.yml"
         mode: '0644'
 
-    - name: Copy journiv environment file
+    - name: Copy journiv environment file from NAS override when available
+      ansible.builtin.copy:
+        src: "{{ journiv_nas_env_file }}"
+        dest: "{{ journiv_app_dir }}/.env"
+        remote_src: true
+        mode: '0644'
+      when: journiv_nas_env_stat.stat.exists and journiv_nas_env_stat.stat.isreg
+
+    - name: Copy journiv environment file from repo default when NAS override is missing
       ansible.builtin.copy:
         src: ../files/homelab-core/journiv/.env.example
         dest: "{{ journiv_app_dir }}/.env"
         mode: '0644'
+      when: not (journiv_nas_env_stat.stat.exists and journiv_nas_env_stat.stat.isreg)
 
     - name: Start journiv service with docker compose
       ansible.builtin.command: docker compose up -d

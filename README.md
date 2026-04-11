@@ -125,6 +125,31 @@ ansible-playbook playbooks/deploy-journiv.yml
 
 `deploy-journiv.yml` validates NAS content/backup paths exist and are writable before deployment.
 
+
+## Configuration precedence (repo defaults + NAS overrides)
+
+The repository remains the default source of truth for:
+
+- playbooks
+- templates and compose files
+- default `group_vars`
+- `.env.example` files
+
+Optional runtime overrides can be stored on NAS under:
+
+- `/mnt/nas/data/homelab-config/group_vars/`
+- `/mnt/nas/data/homelab-config/secrets/`
+- `/mnt/nas/data/homelab-config/app-env/`
+
+Behavior:
+
+1. Repo defaults are always loaded.
+2. If NAS override files exist, they are merged on top of defaults.
+3. If NAS app env files exist (`app-env/memos.env`, `app-env/journiv.env`), deploy playbooks use them.
+4. If NAS overrides are missing, deployment continues with repo defaults.
+
+This keeps bootstrap/rebuild functional from the repo alone while allowing environment-specific NAS overrides.
+
 ## Guardrails
 
 - Do not store DB/cache on NFS.
