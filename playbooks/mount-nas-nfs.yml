@@ -35,3 +35,14 @@
         opts: defaults,_netdev
         state: mounted
       loop: "{{ nas_nfs_mounts }}"
+
+    - name: Check whether NAS config root exists
+      ansible.builtin.stat:
+        path: "{{ nas_config_root }}"
+      register: nas_config_root_stat
+
+    - name: Report NAS config root status
+      ansible.builtin.debug:
+        msg: >-
+          NAS config root {{ nas_config_root }} is {{ 'present' if nas_config_root_stat.stat.exists else 'not present' }}.
+          Repo defaults remain active when this directory is absent.

@@ -6,6 +6,20 @@
   vars_files:
     - ../group_vars/all.yml
     - ../group_vars/homelab_core.yml
+  pre_tasks:
+    - name: Load optional NAS group var and secret overrides
+      ansible.builtin.include_tasks: tasks/load-nas-overrides.yml
+      vars:
+        nas_override_var_files:
+          - "{{ nas_config_group_vars_dir }}/all.yml"
+          - "{{ nas_config_group_vars_dir }}/homelab_core.yml"
+          - "{{ nas_config_secrets_dir }}/all.yml"
+          - "{{ nas_config_secrets_dir }}/homelab_core.yml"
+
+    - name: Check optional memos NAS env override file
+      ansible.builtin.stat:
+        path: "{{ memos_nas_env_file }}"
+      register: memos_nas_env_stat
 
   tasks:
     - name: Ensure memos stack and runtime directories exist
@@ -16,17 +30,50 @@
       loop:
         - "{{ memos_app_dir }}"
         - "{{ memos_data_dir }}"
+
+    - name: Check memos NAS backups directory exists
+      ansible.builtin.stat:
+        path: "{{ memos_exports_dir }}"
+      register: memos_exports_stat
+
+    - name: Fail when memos NAS backups directory is missing
+      ansible.builtin.fail:
+        msg: >-
+          Required NAS backup path {{ memos_exports_dir }} is missing.
+          Create it under /mnt/nas/backups and ensure it is writable from the VM.
+      when: not memos_exports_stat.stat.exists or not memos_exports_stat.stat.isdir
+
+    - name: Verify memos NAS backups directory is writable
+      ansible.builtin.copy:
+        dest: "{{ memos_exports_dir }}/.ansible-write-test"
+        content: "ok\n"
+        mode: '0644'
+
+    - name: Remove memos NAS backups write-test file
+      ansible.builtin.file:
+        path: "{{ memos_exports_dir }}/.ansible-write-test"
+        state: absent
+
     - name: Copy memos docker-compose definition
       ansible.builtin.copy:
         src: ../files/homelab-core/memos/docker-compose.yml
         dest: "{{ memos_app_dir }}/docker-compose.yml"
         mode: '0644'
 
-    - name: Copy memos environment file
+    - name: Copy memos environment file from NAS override when available
+      ansible.builtin.copy:
+        src: "{{ memos_nas_env_file }}"
+        dest: "{{ memos_app_dir }}/.env"
+        remote_src: true
+        mode: '0644'
+      when: memos_nas_env_stat.stat.exists and memos_nas_env_stat.stat.isreg
+
+    - name: Copy memos environment file from repo default when NAS override is missing
       ansible.builtin.copy:
         src: ../files/homelab-core/memos/.env.example
         dest: "{{ memos_app_dir }}/.env"
         mode: '0644'
+      when: not (memos_nas_env_stat.stat.exists and memos_nas_env_stat.stat.isreg)
 
     - name: Start memos service with docker compose
       ansible.builtin.command: docker compose up -d

@@ -1,0 +1,33 @@
+---
+- name: Initialize merged NAS override vars
+  ansible.builtin.set_fact:
+    nas_override_vars_merged: {}
+
+- name: Check optional NAS override files
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop: "{{ nas_override_var_files }}"
+  register: nas_override_stats
+
+- name: Read NAS override files that exist
+  ansible.builtin.slurp:
+    path: "{{ item.item }}"
+  loop: "{{ nas_override_stats.results }}"
+  when: item.stat.exists and item.stat.isreg
+  register: nas_override_slurped
+
+- name: Merge NAS override content
+  ansible.builtin.set_fact:
+    nas_override_vars_merged: >-
+      {{
+        nas_override_vars_merged
+        | combine(((item.content | b64decode | from_yaml) | default({}, true)), recursive=True)
+      }}
+  loop: "{{ nas_override_slurped.results | default([]) }}"
+  when: not item.skipped | default(false)
+
+- name: Apply merged NAS override vars
+  ansible.builtin.set_fact:
+    "{{ item.key }}": "{{ item.value }}"
+  loop: "{{ nas_override_vars_merged | dict2items }}"
+  when: (nas_override_vars_merged | length) > 0

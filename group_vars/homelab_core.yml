@@ -35,3 +35,8 @@ journiv_app_uid: 1000
 journiv_app_gid: 1000
 journiv_healthcheck_url: http://127.0.0.1:8010/
 journiv_healthcheck_status: 200
+
+
+# Optional NAS-hosted app env override files.
+memos_nas_env_file: "{{ nas_config_app_env_dir }}/memos.env"
+journiv_nas_env_file: "{{ nas_config_app_env_dir }}/journiv.env"
