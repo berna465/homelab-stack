@@ -22,6 +22,11 @@
       register: journiv_nas_env_stat
 
   tasks:
+    - name: Apply optional Journiv NAS path overrides when provided
+      ansible.builtin.set_fact:
+        journiv_content_dir: "{{ journiv_nas_content_root | default(journiv_content_dir) }}"
+        journiv_exports_dir: "{{ journiv_backup_root | default(journiv_exports_dir) }}"
+
     - name: Show resolved journiv storage paths
       ansible.builtin.debug:
         msg:
