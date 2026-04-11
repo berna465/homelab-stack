@@ -1,8 +1,4 @@
 ---
-- name: Initialize merged NAS override vars
-  ansible.builtin.set_fact:
-    nas_override_vars_merged: {}
-
 - name: Check optional NAS override files
   ansible.builtin.stat:
     path: "{{ item }}"
@@ -10,40 +6,10 @@
   loop: "{{ nas_override_var_files }}"
   register: nas_override_stats
 
-- name: Collect NAS override files that exist
-  ansible.builtin.set_fact:
-    nas_override_existing_files: >-
-      {{
-        nas_override_stats.results
-        | selectattr('stat.exists', 'defined')
-        | selectattr('stat.exists')
-        | selectattr('stat.isreg', 'defined')
-        | selectattr('stat.isreg')
-        | map(attribute='item')
-        | list
-      }}
-
-- name: Read NAS override files that exist
-  ansible.builtin.slurp:
-    path: "{{ item }}"
-  become: false
-  loop: "{{ nas_override_existing_files }}"
-  register: nas_override_slurped
-  when: nas_override_existing_files | length > 0
-
-- name: Merge NAS override content
-  ansible.builtin.set_fact:
-    nas_override_vars_merged: >-
-      {{
-        nas_override_vars_merged
-        | combine(((item.content | b64decode | from_yaml) | default({}, true)), recursive=True)
-      }}
-  loop: "{{ nas_override_slurped.results | default([]) }}"
-
-- name: Apply merged NAS override vars (skip unresolved Jinja strings)
-  ansible.builtin.set_fact:
-    "{{ item.key }}": "{{ (item.value | template) if (item.value is string) else item.value }}"
-  loop: "{{ nas_override_vars_merged | dict2items }}"
+- name: Include NAS override files that exist
+  ansible.builtin.include_vars:
+    file: "{{ item.item }}"
+  loop: "{{ nas_override_stats.results }}"
   when:
-    - (nas_override_vars_merged | length) > 0
-    - not (item.value is string and (item.value | regex_search('\\{\\{.*\\}\\}')))
+    - item.stat.exists | default(false)
+    - item.stat.isreg | default(false)
