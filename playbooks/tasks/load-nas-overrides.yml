@@ -42,7 +42,7 @@
 
 - name: Apply merged NAS override vars (skip unresolved Jinja strings)
   ansible.builtin.set_fact:
-    "{{ item.key }}": "{{ item.value }}"
+    "{{ item.key }}": "{{ (item.value | template) if (item.value is string) else item.value }}"
   loop: "{{ nas_override_vars_merged | dict2items }}"
   when:
     - (nas_override_vars_merged | length) > 0
