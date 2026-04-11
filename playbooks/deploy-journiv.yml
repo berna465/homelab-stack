@@ -22,6 +22,17 @@
       register: journiv_nas_env_stat
 
   tasks:
+    - name: Show resolved journiv storage paths
+      ansible.builtin.debug:
+        msg:
+          ssh_user: "{{ ansible_user | default('unknown') }}"
+          stack_dir: "{{ journiv_app_dir }}"
+          runtime_dir: "{{ journiv_runtime_dir }}"
+          db_dir: "{{ journiv_db_dir }}"
+          cache_dir: "{{ journiv_cache_dir }}"
+          content_dir: "{{ journiv_content_dir }}"
+          exports_dir: "{{ journiv_exports_dir }}"
+
     - name: Ensure journiv stack and local persistence directories exist
       ansible.builtin.file:
         path: "{{ item }}"
@@ -68,8 +79,11 @@
           Create it and ensure it is writable from the VM.
       when: not journiv_exports_stat.stat.exists or not journiv_exports_stat.stat.isdir
 
-    - name: Check journiv NAS content directory writable by VM user
-      ansible.builtin.command: "test -w {{ journiv_content_dir }}"
+    - name: Check journiv NAS content directory writable by VM user via write probe
+      ansible.builtin.shell: >-
+        probe={{ journiv_content_dir | quote }}/.ansible-write-test-$$ &&
+        (umask 077 && : > "$probe") &&
+        rm -f "$probe"
       become: false
       changed_when: false
       failed_when: false
@@ -78,12 +92,16 @@
     - name: Fail with explicit journiv NAS content permission guidance
       ansible.builtin.fail:
         msg: >-
-          Required NAS path {{ journiv_content_dir }} is not writable by the VM SSH user ({{ ansible_user | default('unknown') }}).
-          Ensure NFS permissions allow writes for this user (or mapped UID/GID), then re-run deploy.
+          Required NAS path {{ journiv_content_dir }} exists but is not writable by the VM SSH user ({{ ansible_user | default('unknown') }}).
+          This is usually NAS ACL/NFS mapping behavior (for example QNAP user/UID/GID/root-squash mismatch).
+          Adjust NAS-side NFS permissions for this VM user and re-run deploy.
       when: journiv_content_writable.rc != 0
 
-    - name: Check journiv NAS backups directory writable by VM user
-      ansible.builtin.command: "test -w {{ journiv_exports_dir }}"
+    - name: Check journiv NAS backups directory writable by VM user via write probe
+      ansible.builtin.shell: >-
+        probe={{ journiv_exports_dir | quote }}/.ansible-write-test-$$ &&
+        (umask 077 && : > "$probe") &&
+        rm -f "$probe"
       become: false
       changed_when: false
       failed_when: false
@@ -92,8 +110,9 @@
     - name: Fail with explicit journiv NAS backups permission guidance
       ansible.builtin.fail:
         msg: >-
-          Required NAS backup path {{ journiv_exports_dir }} is not writable by the VM SSH user ({{ ansible_user | default('unknown') }}).
-          Ensure NFS permissions allow writes for this user (or mapped UID/GID), then re-run deploy.
+          Required NAS backup path {{ journiv_exports_dir }} exists but is not writable by the VM SSH user ({{ ansible_user | default('unknown') }}).
+          This is usually NAS ACL/NFS mapping behavior (for example QNAP user/UID/GID/root-squash mismatch).
+          Adjust NAS-side NFS permissions for this VM user and re-run deploy.
       when: journiv_exports_writable.rc != 0
 
     - name: Copy journiv docker-compose definition
