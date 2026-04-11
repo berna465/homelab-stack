@@ -6,12 +6,14 @@
 - name: Check optional NAS override files
   ansible.builtin.stat:
     path: "{{ item }}"
+  become: false
   loop: "{{ nas_override_var_files }}"
   register: nas_override_stats
 
 - name: Read NAS override files that exist
   ansible.builtin.slurp:
     path: "{{ item.item }}"
+  become: false
   loop: "{{ nas_override_stats.results }}"
   when: item.stat.exists and item.stat.isreg
   register: nas_override_slurped
