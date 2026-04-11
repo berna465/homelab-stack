@@ -141,6 +141,35 @@
         mode: '0644'
       when: not (journiv_nas_env_stat.stat.exists and journiv_nas_env_stat.stat.isreg)
 
+
+    - name: Validate journiv required environment variables are set
+      ansible.builtin.shell: |
+        set -eu
+        required_vars="JOURNIV_IMAGE JOURNIV_PORT JOURNIV_RUNTIME_PATH JOURNIV_CONTENT_PATH JOURNIV_POSTGRES_PATH JOURNIV_VALKEY_PATH POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB"
+        missing=""
+        for key in $required_vars; do
+          value="$(grep -E "^${key}=" .env | tail -n1 | cut -d'=' -f2- || true)"
+          if [ -z "$value" ]; then
+            missing="$missing $key"
+          fi
+        done
+        if [ -n "$missing" ]; then
+          echo "$missing" | xargs -n1
+          exit 1
+        fi
+      args:
+        chdir: "{{ journiv_app_dir }}"
+      changed_when: false
+      failed_when: false
+      register: journiv_env_check
+
+    - name: Fail when journiv .env is missing required variables
+      ansible.builtin.fail:
+        msg: >-
+          Journiv .env at {{ journiv_app_dir }}/.env is missing required variables: {{ journiv_env_check.stdout_lines | join(', ') }}.
+          Populate the missing values in the NAS override env file ({{ journiv_nas_env_file }}) or in files/homelab-core/journiv/.env.example before deploy.
+      when: journiv_env_check.rc != 0
+
     - name: Start journiv service with docker compose
       ansible.builtin.command: docker compose up -d
       args:
