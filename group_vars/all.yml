@@ -1,4 +1,4 @@
-# Shared defaults for the homelab v1 workflow.
+# Shared defaults for the clean rebuild workflow.
 proxmox_node_host: proxmox.home.bernardolab.it
 
 vm_template_id: 902
@@ -15,9 +15,7 @@ vm_ipconfig0: ip=192.168.178.210/24,gw=192.168.178.1
 # Override this value with your own key before running provision.
 vm_ssh_public_key: "{{ lookup('file', lookup('env', 'HOME') + '/.ssh/id_rsa.pub') }}"
 
-homelab_core_app_dir: /opt/homelab-core
-
-# Dedicated application data disk settings.
+# Dedicated local data disk settings.
 vm_data_disk_slot: scsi1
 vm_data_disk_storage: local-lvm
 vm_data_disk_size_gb: 40
@@ -27,12 +25,28 @@ vm_data_disk_device: ''
 vm_data_disk_filesystem: ext4
 vm_data_mount_point: /data
 vm_data_subdirectories:
-  - apps
+  - stacks
   - db
-  - memos
-  - journiv
-  - bookstack
+  - cache
+  - runtime
+  - backups-local
 
+# NAS NFS settings (replace placeholders with your NAS exports).
+nas_nfs_server: nas.local
+nas_nfs_mount_root: /mnt/nas
+nas_nfs_mounts:
+  - export: /exports/apps
+    mountpoint: "{{ nas_nfs_mount_root }}/apps"
+  - export: /exports/media
+    mountpoint: "{{ nas_nfs_mount_root }}/media"
+  - export: /exports/documents
+    mountpoint: "{{ nas_nfs_mount_root }}/documents"
+  - export: /exports/photos
+    mountpoint: "{{ nas_nfs_mount_root }}/photos"
+  - export: /exports/backups
+    mountpoint: "{{ nas_nfs_mount_root }}/backups"
+  - export: /exports/shared
+    mountpoint: "{{ nas_nfs_mount_root }}/shared"
 
 # Root disk sizing for container image pulls and runtime overhead.
 vm_root_disk_slot: scsi0

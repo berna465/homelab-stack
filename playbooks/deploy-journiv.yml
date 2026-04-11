@@ -8,30 +8,33 @@
     - ../group_vars/homelab_core.yml
 
   tasks:
-    - name: Ensure journiv application directory exists
-      ansible.builtin.file:
-        path: "{{ journiv_app_dir }}"
-        state: directory
-        mode: '0755'
-
-    - name: Ensure journiv data directories exist
+    - name: Ensure journiv stack and local persistence directories exist
       ansible.builtin.file:
         path: "{{ item }}"
         state: directory
         mode: '0755'
       loop:
-        - "{{ journiv_data_dir }}"
-        - "{{ journiv_data_dir }}/app"
-        - "{{ journiv_data_dir }}/postgres"
-        - "{{ journiv_data_dir }}/valkey"
+        - "{{ journiv_app_dir }}"
+        - "{{ journiv_runtime_dir }}"
+        - "{{ journiv_db_dir }}"
+        - "{{ journiv_cache_dir }}"
 
-    - name: Show Journiv app uid/gid used for host directory permissions
+    - name: Ensure journiv NAS directories exist
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - "{{ journiv_media_dir }}"
+        - "{{ journiv_exports_dir }}"
+
+    - name: Show Journiv app uid/gid used for writable directories
       ansible.builtin.debug:
         msg: >-
           Using uid={{ journiv_app_uid }} gid={{ journiv_app_gid }}
-          for {{ journiv_data_dir }}/app ownership.
+          for {{ journiv_runtime_dir }} and {{ journiv_media_dir }} ownership.
 
-    - name: Ensure journiv app writable subdirectories exist
+    - name: Ensure journiv writable runtime and media subdirectories exist
       ansible.builtin.file:
         path: "{{ item }}"
         state: directory
@@ -39,18 +42,9 @@
         group: "{{ journiv_app_gid }}"
         mode: '0775'
       loop:
-        - "{{ journiv_data_dir }}/app"
-        - "{{ journiv_data_dir }}/app/media"
-        - "{{ journiv_data_dir }}/app/logs"
-
-    - name: Ensure journiv app data tree ownership and permissions are correct
-      ansible.builtin.file:
-        path: "{{ journiv_data_dir }}/app"
-        state: directory
-        owner: "{{ journiv_app_uid }}"
-        group: "{{ journiv_app_gid }}"
-        mode: '0775'
-        recurse: true
+        - "{{ journiv_runtime_dir }}"
+        - "{{ journiv_runtime_dir }}/logs"
+        - "{{ journiv_media_dir }}"
 
     - name: Copy journiv docker-compose definition
       ansible.builtin.copy:
