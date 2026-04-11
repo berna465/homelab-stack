@@ -6,10 +6,40 @@
   loop: "{{ nas_override_var_files }}"
   register: nas_override_stats
 
+- name: Collect NAS override files that exist
+  ansible.builtin.set_fact:
+    nas_override_existing_files: >-
+      {{
+        nas_override_stats.results
+        | selectattr('stat.exists', 'defined')
+        | selectattr('stat.exists')
+        | selectattr('stat.isreg', 'defined')
+        | selectattr('stat.isreg')
+        | map(attribute='item')
+        | list
+      }}
+
+- name: Validate NAS override files contain only concrete values
+  ansible.builtin.command: >-
+    grep -nE "\{\{.*\}\}" {{ item }}
+  become: false
+  changed_when: false
+  failed_when: false
+  loop: "{{ nas_override_existing_files }}"
+  register: nas_override_jinja_checks
+  when: nas_override_existing_files | length > 0
+
+- name: Fail when NAS override files contain Jinja templates
+  ansible.builtin.fail:
+    msg: >-
+      NAS override file {{ item.item }} contains Jinja template expressions (line(s): {{ item.stdout_lines | join(', ') }}).
+      NAS overrides must contain only concrete values (no {{ '{{ ... }}' }}).
+      Move derived/template variables back to repository group_vars and keep NAS files for concrete overrides/secrets only.
+  loop: "{{ nas_override_jinja_checks.results | default([]) }}"
+  when: item.rc == 0
+
 - name: Include NAS override files that exist
   ansible.builtin.include_vars:
-    file: "{{ item.item }}"
-  loop: "{{ nas_override_stats.results }}"
-  when:
-    - item.stat.exists | default(false)
-    - item.stat.isreg | default(false)
+    file: "{{ item }}"
+  loop: "{{ nas_override_existing_files }}"
+  when: nas_override_existing_files | length > 0
