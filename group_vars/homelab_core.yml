@@ -1,16 +1,36 @@
-# Service endpoint checks for the minimal Docker stack.
+# Service endpoint checks for the whoami smoke-test stack.
 homelab_core_healthcheck_url: http://127.0.0.1:8080
 homelab_core_healthcheck_status: 200
 
-# Memos stack settings (v1: direct host port, no reverse proxy).
-memos_app_dir: /opt/memos
-memos_data_dir: /opt/memos/data
+# Local runtime paths on /data.
+homelab_core_stacks_root: /data/stacks
+homelab_core_runtime_root: /data/runtime
+homelab_core_db_root: /data/db
+homelab_core_cache_root: /data/cache
+
+# NAS mount roots on /mnt/nas.
+homelab_core_nas_apps_root: /mnt/nas/apps
+homelab_core_nas_media_root: /mnt/nas/media
+homelab_core_nas_documents_root: /mnt/nas/documents
+homelab_core_nas_backups_root: /mnt/nas/backups
+
+# Whoami stack settings.
+homelab_core_app_dir: "{{ homelab_core_stacks_root }}/whoami"
+
+# Memos stack settings.
+memos_app_dir: "{{ homelab_core_stacks_root }}/memos"
+memos_data_dir: "{{ homelab_core_runtime_root }}/memos"
+memos_exports_dir: "{{ homelab_core_nas_backups_root }}/memos"
 memos_healthcheck_url: http://127.0.0.1:5230
 memos_healthcheck_status: 200
 
-# Journiv stack settings (v1: direct host port, no reverse proxy).
-journiv_app_dir: /opt/journiv
-journiv_data_dir: /opt/journiv/data
+# Journiv stack settings.
+journiv_app_dir: "{{ homelab_core_stacks_root }}/journiv"
+journiv_runtime_dir: "{{ homelab_core_runtime_root }}/journiv"
+journiv_db_dir: "{{ homelab_core_db_root }}/journiv-postgres"
+journiv_cache_dir: "{{ homelab_core_cache_root }}/journiv-valkey"
+journiv_media_dir: "{{ homelab_core_nas_media_root }}/journiv"
+journiv_exports_dir: "{{ homelab_core_nas_backups_root }}/journiv"
 journiv_app_uid: 1000
 journiv_app_gid: 1000
 journiv_healthcheck_url: http://127.0.0.1:8010/

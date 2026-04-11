@@ -1,14 +1,25 @@
-# homelab-stack (Ansible v1)
+# homelab-stack (clean rebuild model)
 
-Minimal Ansible infrastructure-as-code for one Proxmox VM (`homelab-core`) with simple, app-by-app Docker Compose deployments.
+Minimal Ansible infrastructure-as-code for one Proxmox VM (`homelab-core`) with explicit storage layering:
 
-Current validated flows:
+- **VM local `/data`** for technical persistence (databases, cache, runtime state, stack directories)
+- **NAS `/mnt/nas` via NFS** for durable user content (media, documents, exports, backups)
 
-1. Provision VM with `qm` commands via Ansible
-2. SSH into the VM
-3. Deploy independent Docker Compose stacks
-4. Verify HTTP health checks
-5. Attach and prepare a dedicated data disk for persistent app data
+## Architecture targets
+
+- Proxmox host: `proxmox.home.bernardolab.it`
+- Template VMID: `902`
+- Target VM:
+  - VMID: `210`
+  - Name: `homelab-core`
+  - IP: `192.168.178.210/24`
+  - Gateway: `192.168.178.1`
+  - Cloud-init user: `debian`
+
+Design principle:
+
+- The VM is the engine (`/data`)
+- The NAS is the memory (`/mnt/nas`)
 
 ## Repository structure
 
@@ -22,166 +33,126 @@ homelab-stack/
 │   └── homelab_core.yml
 ├── playbooks/
 │   ├── provision.yml
-│   ├── deploy.yml                 # whoami smoke-test stack
-│   ├── deploy-memos.yml           # memos app stack
-│   ├── deploy-journiv.yml         # journiv app stack
-│   ├── attach-data-disk.yml       # attach dedicated disk in Proxmox
-│   └── prepare-data-disk.yml      # format, mount, and prepare /data
+│   ├── attach-data-disk.yml
+│   ├── prepare-data-disk.yml
+│   ├── mount-nas-nfs.yml
+│   ├── deploy.yml                 # whoami smoke test
+│   ├── deploy-memos.yml
+│   └── deploy-journiv.yml
 └── files/
     └── homelab-core/
-        ├── docker-compose.yml     # whoami smoke-test stack
-        ├── .env.example           # whoami example env
+        ├── docker-compose.yml
         ├── memos/
-        │   ├── docker-compose.yml
-        │   └── .env.example
         └── journiv/
-            ├── docker-compose.yml
-            └── .env.example
 ```
 
-## Environment details
+## Storage model
 
-- Proxmox host: `proxmox.home.bernardolab.it`
-- Template VMID: `902`
-- Target VM:
-  - VMID: `210`
-  - Name: `homelab-core`
-  - IP: `192.168.178.210/24`
-  - Gateway: `192.168.178.1`
-  - Cloud-init user: `debian`
+### Local VM data disk mounted at `/data`
+
+Used for:
+
+- `/data/stacks` (compose stacks)
+- `/data/db` (PostgreSQL/MariaDB)
+- `/data/cache` (Redis/Valkey)
+- `/data/runtime` (runtime state)
+- `/data/backups-local` (local technical snapshots)
+
+### NAS NFS mounts under `/mnt/nas`
+
+Used for:
+
+- `/mnt/nas/apps`
+- `/mnt/nas/media`
+- `/mnt/nas/documents`
+- `/mnt/nas/photos`
+- `/mnt/nas/backups`
+- `/mnt/nas/shared`
+
+`group_vars/all.yml` contains explicit placeholders for `nas_nfs_server` and export paths; replace them before running NFS mount playbooks.
 
 ## Prerequisites
 
-- Ansible installed on your control machine
+- Ansible installed on control machine
 - SSH access to Proxmox as `root`
-- SSH public key available locally (default lookup: `~/.ssh/id_rsa.pub`)
-- Template VM `902` already present on Proxmox with cloud-init enabled
+- SSH public key locally available (default `~/.ssh/id_rsa.pub`)
+- Template VM `902` present on Proxmox with cloud-init enabled
+- NAS reachable from VM with NFS exports configured
 
-## Usage
+## Clean rebuild execution order
 
 Run commands from repository root.
 
-### 1) Verify access to Proxmox
-
-```bash
-ansible proxmox -m command -a "hostname"
-```
-
-### 2) Provision VM (create or validate)
+### 1) Provision VM (create-only)
 
 ```bash
 ansible-playbook playbooks/provision.yml
 ```
 
-### 3) Verify SSH to homelab-core
-
-```bash
-ansible homelab_core -m command -a "hostname"
-```
-
-### 4) Deploy whoami smoke-test stack (baseline)
-
-```bash
-ansible-playbook playbooks/deploy.yml
-```
-
-Quick check:
-
-```bash
-curl -i http://192.168.178.210:8080
-```
-
-### 5) Deploy memos stack
-
-```bash
-ansible-playbook playbooks/deploy-memos.yml
-```
-
-What this playbook does:
-
-- creates `/opt/memos` and `/opt/memos/data`
-- copies `files/homelab-core/memos/docker-compose.yml`
-- copies `files/homelab-core/memos/.env.example` to `/opt/memos/.env`
-- runs `docker compose up -d`
-- checks `http://127.0.0.1:5230/api/v1/status` from the VM
-
-### 6) Test memos externally
-
-```bash
-curl -i http://192.168.178.210:5230/api/v1/status
-```
-
-If deployment is healthy, the endpoint returns `HTTP/1.1 200`.
-
-Open in browser:
-
-- `http://192.168.178.210:5230`
-
-### 7) Deploy journiv stack
-
-```bash
-ansible-playbook playbooks/deploy-journiv.yml
-```
-
-What this playbook does:
-
-- creates `/opt/journiv` and `/opt/journiv/data` (plus app/postgres/valkey subdirectories)
-- copies `files/homelab-core/journiv/docker-compose.yml`
-- copies `files/homelab-core/journiv/.env.example` to `/opt/journiv/.env`
-- runs `docker compose up -d`
-- checks `http://127.0.0.1:8010/` from the VM
-
-### 8) Test journiv externally
-
-```bash
-curl -i http://192.168.178.210:8010/
-```
-
-Open in browser:
-
-- `http://192.168.178.210:8010`
-
-
-### 9) Attach dedicated data disk on Proxmox
+### 2) Attach dedicated local data disk on Proxmox
 
 ```bash
 ansible-playbook playbooks/attach-data-disk.yml
 ```
 
-What this playbook does:
-
-- reads VM `210` configuration from Proxmox
-- checks whether slot `scsi1` is already configured
-- attaches a new disk (default `local-lvm:40`) only when missing
-
-### 10) Prepare and mount data disk inside homelab-core
+### 3) Prepare and mount local data disk at `/data`
 
 ```bash
 ansible-playbook playbooks/prepare-data-disk.yml
 ```
 
-What this playbook does:
-
-- detects the secondary disk (or uses `vm_data_disk_device` when set)
-- creates an `ext4` filesystem when the disk is not formatted yet
-- mounts the disk persistently at `/data` using UUID in `/etc/fstab`
-- creates standard persistence directories under `/data`:
-  - `/data/apps`
-  - `/data/db`
-  - `/data/memos`
-  - `/data/journiv`
-  - `/data/bookstack`
-
-### 11) Verify mounted data disk
+### 4) Mount NAS NFS shares under `/mnt/nas/...`
 
 ```bash
-ansible homelab_core -b -m command -a "findmnt /data"
-ansible homelab_core -b -m command -a "df -h /data"
-ansible homelab_core -b -m command -a "ls -la /data"
+ansible-playbook playbooks/mount-nas-nfs.yml
 ```
+
+### 5) Deploy whoami smoke-test stack
+
+```bash
+ansible-playbook playbooks/deploy.yml
+curl -i http://192.168.178.210:8080
+```
+
+### 6) Deploy app stacks one by one
+
+Memos:
+
+```bash
+ansible-playbook playbooks/deploy-memos.yml
+curl -i http://192.168.178.210:5230/api/v1/status
+```
+
+Journiv:
+
+```bash
+ansible-playbook playbooks/deploy-journiv.yml
+curl -i http://192.168.178.210:8010/
+```
+
+## App storage conventions
+
+### whoami
+
+- Smoke test only
+- Minimal local footprint in `/data/stacks/whoami`
+
+### memos
+
+- Local runtime state: `/data/runtime/memos`
+- Stack path: `/data/stacks/memos`
+- NAS backup/export target: `/mnt/nas/backups/memos`
+
+### journiv
+
+- App runtime local: `/data/runtime/journiv`
+- PostgreSQL local: `/data/db/journiv-postgres`
+- Valkey local: `/data/cache/journiv-valkey`
+- Media/content on NAS: `/mnt/nas/media/journiv`
+- Backups/exports on NAS: `/mnt/nas/backups/journiv`
 
 ## Notes
 
 - Keep stacks independent and deploy one app at a time.
-- No reverse proxy/authelia/cloudflared in v1.
-- `playbooks/deploy.yml` (whoami) remains as the known-good baseline.
+- No reverse proxy/auth layer in this baseline.
+- Do not place databases or cache services on NFS.

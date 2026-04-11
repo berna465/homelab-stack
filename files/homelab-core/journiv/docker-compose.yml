@@ -1,4 +1,4 @@
-# Journiv official PostgreSQL-based stack adapted for homelab-core deployment.
+# Journiv PostgreSQL-based stack adapted for /data (local) + /mnt/nas (content) layout.
 x-base-env: &base-env
   REDIS_URL: redis://valkey:6379/0
   CELERY_BROKER_URL: redis://valkey:6379/0
@@ -10,7 +10,8 @@ x-celery-common: &celery-common
   image: ${JOURNIV_IMAGE}
   env_file: .env
   volumes:
-    - ${JOURNIV_DATA_PATH}/app:/data
+    - ${JOURNIV_RUNTIME_PATH}:/data
+    - ${JOURNIV_MEDIA_PATH}:/data/media
   depends_on:
     postgres:
       condition: service_healthy
@@ -24,7 +25,8 @@ x-app-common: &app-common
   image: ${JOURNIV_IMAGE}
   env_file: .env
   volumes:
-    - ${JOURNIV_DATA_PATH}/app:/data
+    - ${JOURNIV_RUNTIME_PATH}:/data
+    - ${JOURNIV_MEDIA_PATH}:/data/media
   depends_on:
     postgres:
       condition: service_healthy
@@ -49,7 +51,7 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB}
     volumes:
-      - ${JOURNIV_DATA_PATH}/postgres:/var/lib/postgresql
+      - ${JOURNIV_POSTGRES_PATH}:/var/lib/postgresql
     networks:
       - backend
     restart: unless-stopped
@@ -65,7 +67,7 @@ services:
     container_name: journiv-valkey-cache
     restart: unless-stopped
     volumes:
-      - ${JOURNIV_DATA_PATH}/valkey:/data
+      - ${JOURNIV_VALKEY_PATH}:/data
     networks:
       - backend
     healthcheck:

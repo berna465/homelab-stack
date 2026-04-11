@@ -8,15 +8,18 @@
     - ../group_vars/homelab_core.yml
 
   tasks:
-    - name: Ensure memos application directory exists
+    - name: Ensure memos stack and runtime directories exist
       ansible.builtin.file:
-        path: "{{ memos_app_dir }}"
+        path: "{{ item }}"
         state: directory
         mode: '0755'
+      loop:
+        - "{{ memos_app_dir }}"
+        - "{{ memos_data_dir }}"
 
-    - name: Ensure memos data directory exists
+    - name: Ensure memos NAS exports directory exists
       ansible.builtin.file:
-        path: "{{ memos_data_dir }}"
+        path: "{{ memos_exports_dir }}"
         state: directory
         mode: '0755'
 

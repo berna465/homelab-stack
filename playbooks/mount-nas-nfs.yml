@@ -1,0 +1,37 @@
+---
+- name: Mount NAS NFS shares on homelab-core
+  hosts: homelab_core
+  gather_facts: false
+  become: true
+  vars_files:
+    - ../group_vars/all.yml
+
+  tasks:
+    - name: Ensure NFS client packages are installed
+      ansible.builtin.apt:
+        name:
+          - nfs-common
+        state: present
+        update_cache: true
+
+    - name: Ensure NAS mount root exists
+      ansible.builtin.file:
+        path: "{{ nas_nfs_mount_root }}"
+        state: directory
+        mode: '0755'
+
+    - name: Ensure NAS mountpoints exist
+      ansible.builtin.file:
+        path: "{{ item.mountpoint }}"
+        state: directory
+        mode: '0755'
+      loop: "{{ nas_nfs_mounts }}"
+
+    - name: Mount NFS shares and persist in fstab
+      ansible.posix.mount:
+        path: "{{ item.mountpoint }}"
+        src: "{{ nas_nfs_server }}:{{ item.export }}"
+        fstype: nfs
+        opts: defaults,_netdev
+        state: mounted
+      loop: "{{ nas_nfs_mounts }}"

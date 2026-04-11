@@ -1,5 +1,5 @@
 ---
-- name: Deploy minimal compose stack to homelab-core
+- name: Deploy whoami smoke-test stack to homelab-core
   hosts: homelab_core
   gather_facts: false
   become: true
@@ -8,7 +8,7 @@
     - ../group_vars/homelab_core.yml
 
   tasks:
-    - name: Ensure application directory exists
+    - name: Ensure whoami stack directory exists
       ansible.builtin.file:
         path: "{{ homelab_core_app_dir }}"
         state: directory
