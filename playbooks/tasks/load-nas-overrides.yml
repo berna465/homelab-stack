@@ -46,4 +46,4 @@
   loop: "{{ nas_override_vars_merged | dict2items }}"
   when:
     - (nas_override_vars_merged | length) > 0
-    - not (item.value is string and '{{' in item.value and '}}' in item.value)
+    - not (item.value is string and (item.value | regex_search('\\{\\{.*\\}\\}')))
