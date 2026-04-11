@@ -1,0 +1,109 @@
+---
+- name: Prepare NAS directory structure for homelab
+  hosts: homelab_core
+  become: false
+  gather_facts: false
+
+  vars:
+    nas_data_root: /mnt/nas/data
+    nas_media_root: /mnt/nas/media
+    nas_backups_root: /mnt/nas/backups
+
+    nas_config_root: "{{ nas_data_root }}/homelab-config"
+    nas_apps_root: "{{ nas_data_root }}/apps"
+
+  tasks:
+    - name: Check NAS data root availability
+      ansible.builtin.stat:
+        path: "{{ nas_data_root }}"
+      register: nas_data_root_stat
+
+    - name: Fail if NAS data root is not mounted
+      ansible.builtin.fail:
+        msg: "{{ nas_data_root }} is not available. Ensure NFS mounts are working."
+      when: not nas_data_root_stat.stat.exists
+
+    - name: Check NAS media root availability
+      ansible.builtin.stat:
+        path: "{{ nas_media_root }}"
+      register: nas_media_root_stat
+
+    - name: Fail if NAS media root is not mounted
+      ansible.builtin.fail:
+        msg: "{{ nas_media_root }} is not available. Ensure NFS mounts are working."
+      when: not nas_media_root_stat.stat.exists
+
+    - name: Check NAS backups root availability
+      ansible.builtin.stat:
+        path: "{{ nas_backups_root }}"
+      register: nas_backups_root_stat
+
+    - name: Fail if NAS backups root is not mounted
+      ansible.builtin.fail:
+        msg: "{{ nas_backups_root }} is not available. Ensure NFS mounts are working."
+      when: not nas_backups_root_stat.stat.exists
+
+    - name: Ensure homelab config directories exist under NAS data root
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+      loop:
+        - "{{ nas_config_root }}"
+        - "{{ nas_config_root }}/group_vars"
+        - "{{ nas_config_root }}/secrets"
+        - "{{ nas_config_root }}/app-env"
+
+    - name: Ensure writable apps root exists under NAS data root
+      ansible.builtin.file:
+        path: "{{ nas_apps_root }}"
+        state: directory
+
+    - name: Verify NAS data root is writable
+      ansible.builtin.copy:
+        content: "ansible-write-test\n"
+        dest: "{{ nas_data_root }}/.ansible_write_test"
+      register: nas_data_write_test
+      become: false
+
+    - name: Remove NAS data root write test file
+      ansible.builtin.file:
+        path: "{{ nas_data_root }}/.ansible_write_test"
+        state: absent
+      when: nas_data_write_test is succeeded
+      become: false
+
+    - name: Verify NAS apps root is writable
+      ansible.builtin.copy:
+        content: "ansible-write-test\n"
+        dest: "{{ nas_apps_root }}/.ansible_write_test"
+      register: nas_apps_write_test
+      become: false
+
+    - name: Remove NAS apps root write test file
+      ansible.builtin.file:
+        path: "{{ nas_apps_root }}/.ansible_write_test"
+        state: absent
+      when: nas_apps_write_test is succeeded
+      become: false
+
+    - name: Verify NAS backups root is writable
+      ansible.builtin.copy:
+        content: "ansible-write-test\n"
+        dest: "{{ nas_backups_root }}/.ansible_write_test"
+      register: nas_backups_write_test
+      failed_when: false
+      become: false
+
+    - name: Fail if NAS backups root is not writable
+      ansible.builtin.fail:
+        msg: >-
+          {{ nas_backups_root }} exists but is not writable from the VM user.
+          Fix NAS permissions/ACLs or create required backup directories manually on the NAS.
+      when: nas_backups_write_test is failed
+
+    - name: Remove NAS backups root write test file
+      ansible.builtin.file:
+        path: "{{ nas_backups_root }}/.ansible_write_test"
+        state: absent
+      when: nas_backups_write_test is succeeded
+      become: false
