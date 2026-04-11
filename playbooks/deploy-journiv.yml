@@ -19,22 +19,7 @@
         - "{{ journiv_db_dir }}"
         - "{{ journiv_cache_dir }}"
 
-    - name: Ensure journiv NAS directories exist
-      ansible.builtin.file:
-        path: "{{ item }}"
-        state: directory
-        mode: '0755'
-      loop:
-        - "{{ journiv_media_dir }}"
-        - "{{ journiv_exports_dir }}"
-
-    - name: Show Journiv app uid/gid used for writable directories
-      ansible.builtin.debug:
-        msg: >-
-          Using uid={{ journiv_app_uid }} gid={{ journiv_app_gid }}
-          for {{ journiv_runtime_dir }} and {{ journiv_media_dir }} ownership.
-
-    - name: Ensure journiv writable runtime and media subdirectories exist
+    - name: Ensure journiv local writable runtime subdirectories exist
       ansible.builtin.file:
         path: "{{ item }}"
         state: directory
@@ -44,7 +29,52 @@
       loop:
         - "{{ journiv_runtime_dir }}"
         - "{{ journiv_runtime_dir }}/logs"
-        - "{{ journiv_media_dir }}"
+
+    - name: Check journiv NAS content directory exists
+      ansible.builtin.stat:
+        path: "{{ journiv_content_dir }}"
+      register: journiv_content_stat
+
+    - name: Fail when journiv NAS content directory is missing
+      ansible.builtin.fail:
+        msg: >-
+          Required NAS path {{ journiv_content_dir }} is missing.
+          Create it under /mnt/nas/data/apps and ensure it is writable from the VM.
+      when: not journiv_content_stat.stat.exists or not journiv_content_stat.stat.isdir
+
+    - name: Check journiv NAS backups directory exists
+      ansible.builtin.stat:
+        path: "{{ journiv_exports_dir }}"
+      register: journiv_exports_stat
+
+    - name: Fail when journiv NAS backups directory is missing
+      ansible.builtin.fail:
+        msg: >-
+          Required NAS backup path {{ journiv_exports_dir }} is missing.
+          Create it and ensure it is writable from the VM.
+      when: not journiv_exports_stat.stat.exists or not journiv_exports_stat.stat.isdir
+
+    - name: Verify journiv NAS content directory is writable
+      ansible.builtin.copy:
+        dest: "{{ journiv_content_dir }}/.ansible-write-test"
+        content: "ok\n"
+        mode: '0644'
+
+    - name: Remove journiv NAS content write-test file
+      ansible.builtin.file:
+        path: "{{ journiv_content_dir }}/.ansible-write-test"
+        state: absent
+
+    - name: Verify journiv NAS backups directory is writable
+      ansible.builtin.copy:
+        dest: "{{ journiv_exports_dir }}/.ansible-write-test"
+        content: "ok\n"
+        mode: '0644'
+
+    - name: Remove journiv NAS backups write-test file
+      ansible.builtin.file:
+        path: "{{ journiv_exports_dir }}/.ansible-write-test"
+        state: absent
 
     - name: Copy journiv docker-compose definition
       ansible.builtin.copy:

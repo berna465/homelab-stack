@@ -31,22 +31,19 @@ vm_data_subdirectories:
   - runtime
   - backups-local
 
-# NAS NFS settings (replace placeholders with your NAS exports).
+# NAS NFS settings.
+# Replace nas_nfs_server with your NAS hostname/IP if needed.
 nas_nfs_server: nas.local
 nas_nfs_mount_root: /mnt/nas
 nas_nfs_mounts:
-  - export: /exports/apps
-    mountpoint: "{{ nas_nfs_mount_root }}/apps"
-  - export: /exports/media
+  - export: /DATA
+    mountpoint: "{{ nas_nfs_mount_root }}/data"
+  - export: /Media
     mountpoint: "{{ nas_nfs_mount_root }}/media"
-  - export: /exports/documents
-    mountpoint: "{{ nas_nfs_mount_root }}/documents"
-  - export: /exports/photos
-    mountpoint: "{{ nas_nfs_mount_root }}/photos"
-  - export: /exports/backups
+  - export: /Backups
     mountpoint: "{{ nas_nfs_mount_root }}/backups"
-  - export: /exports/shared
-    mountpoint: "{{ nas_nfs_mount_root }}/shared"
+  - export: /Clouds
+    mountpoint: "{{ nas_nfs_mount_root }}/clouds"
 
 # Root disk sizing for container image pulls and runtime overhead.
 vm_root_disk_slot: scsi0

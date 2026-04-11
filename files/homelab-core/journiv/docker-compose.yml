@@ -11,7 +11,7 @@ x-celery-common: &celery-common
   env_file: .env
   volumes:
     - ${JOURNIV_RUNTIME_PATH}:/data
-    - ${JOURNIV_MEDIA_PATH}:/data/media
+    - ${JOURNIV_CONTENT_PATH}:/data/media
   depends_on:
     postgres:
       condition: service_healthy
@@ -26,7 +26,7 @@ x-app-common: &app-common
   env_file: .env
   volumes:
     - ${JOURNIV_RUNTIME_PATH}:/data
-    - ${JOURNIV_MEDIA_PATH}:/data/media
+    - ${JOURNIV_CONTENT_PATH}:/data/media
   depends_on:
     postgres:
       condition: service_healthy

@@ -8,11 +8,11 @@ homelab_core_runtime_root: /data/runtime
 homelab_core_db_root: /data/db
 homelab_core_cache_root: /data/cache
 
-# NAS mount roots on /mnt/nas.
-homelab_core_nas_apps_root: /mnt/nas/apps
-homelab_core_nas_media_root: /mnt/nas/media
-homelab_core_nas_documents_root: /mnt/nas/documents
+# NAS paths.
+homelab_core_nas_data_root: /mnt/nas/data
+homelab_core_nas_apps_root: /mnt/nas/data/apps
 homelab_core_nas_backups_root: /mnt/nas/backups
+homelab_core_nas_media_root: /mnt/nas/media
 
 # Whoami stack settings.
 homelab_core_app_dir: "{{ homelab_core_stacks_root }}/whoami"
@@ -29,7 +29,7 @@ journiv_app_dir: "{{ homelab_core_stacks_root }}/journiv"
 journiv_runtime_dir: "{{ homelab_core_runtime_root }}/journiv"
 journiv_db_dir: "{{ homelab_core_db_root }}/journiv-postgres"
 journiv_cache_dir: "{{ homelab_core_cache_root }}/journiv-valkey"
-journiv_media_dir: "{{ homelab_core_nas_media_root }}/journiv"
+journiv_content_dir: "{{ homelab_core_nas_apps_root }}/journiv"
 journiv_exports_dir: "{{ homelab_core_nas_backups_root }}/journiv"
 journiv_app_uid: 1000
 journiv_app_gid: 1000

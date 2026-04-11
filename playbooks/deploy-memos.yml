@@ -16,13 +16,6 @@
       loop:
         - "{{ memos_app_dir }}"
         - "{{ memos_data_dir }}"
-
-    - name: Ensure memos NAS exports directory exists
-      ansible.builtin.file:
-        path: "{{ memos_exports_dir }}"
-        state: directory
-        mode: '0755'
-
     - name: Copy memos docker-compose definition
       ansible.builtin.copy:
         src: ../files/homelab-core/memos/docker-compose.yml
