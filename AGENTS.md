@@ -6,7 +6,8 @@
 - Prefer one application stack at a time.
 - Do not refactor unrelated files.
 - Keep provisioning create-only unless explicitly requested otherwise.
-- Preserve `become: true` in deploy playbooks where privileged filesystem paths are used.
+- Preserve `become: true` for local filesystem tasks under `/data/...`.
+- Be careful with `become: true` on NFS mounts, as root may not have write access due to NFS permissions.
 
 ## Project baseline
 
@@ -14,6 +15,52 @@
 - Proxmox host: `proxmox.home.bernardolab.it`
 - Single VM: `homelab-core` (`VMID 210`, `192.168.178.210`)
 - Clean rebuild is allowed; old path assumptions do not need to be preserved.
+
+---
+
+## Configuration model
+
+The repository provides default configuration and templates.
+
+Environment-specific configuration may live on the NAS and override repo defaults when present.
+
+### Preferred NAS configuration root
+
+- `/mnt/nas/data/homelab-config/`
+
+### Possible structure
+
+- `/mnt/nas/data/homelab-config/group_vars/`
+- `/mnt/nas/data/homelab-config/secrets/`
+- `/mnt/nas/data/homelab-config/app-env/`
+
+### Rules
+
+- Repo contains:
+  - default `group_vars`
+  - `.env.example` files
+  - playbooks
+  - compose templates
+
+- NAS may contain:
+  - real environment overrides
+  - secrets and credentials
+  - `.env` files used at runtime
+
+### Behavior
+
+- Use repo defaults when no NAS configuration is present.
+- If NAS configuration exists, prefer it over repo defaults.
+- Do not assume NAS configuration always exists.
+- Do not duplicate full repository logic on the NAS.
+
+### Constraints
+
+- Do not store playbooks or repository logic on the NAS.
+- Do not rely exclusively on NAS configuration for bootstrap.
+- The system must remain rebuildable from the repository alone.
+
+---
 
 ## Storage source of truth
 
@@ -36,15 +83,25 @@ Mounted shares:
 - `/mnt/nas/backups` from `/Backups`
 - `/mnt/nas/clouds` from `/Clouds`
 
-Writable app content should go under:
+### Writable application content
 
 - `/mnt/nas/data/apps/<app>/...`
 
-Backups should go under:
+### Backups
 
 - `/mnt/nas/backups/<app>/...`
 
-`/mnt/nas/media` is for media libraries (movies/music/tv/photos) and must not be treated as generic app-write storage.
+### Media libraries
+
+- `/mnt/nas/media/...` is for:
+  - movies
+  - music
+  - TV
+  - photo/media collections
+
+Do not treat `/mnt/nas/media` as generic writable app storage.
+
+---
 
 ## Hard constraints
 
@@ -55,6 +112,8 @@ Backups should go under:
 - Do **not** create generic app directories directly under `/mnt/nas/media`.
 - If an NFS-backed required app path is missing or not writable, fail clearly.
 
+---
+
 ## Architecture boundaries
 
 - One VM only for now.
@@ -64,27 +123,26 @@ Backups should go under:
 - No Dokploy/CasaOS integration.
 - No premature multi-VM redesign.
 
+---
+
 ## Storage rules
 
-* Use `/data/...` for local technical persistence only:
+- Use `/data/...` for local technical persistence only:
+  - databases
+  - cache
+  - runtime
+  - stack directories
 
-  * databases
-  * cache
-  * runtime
-  * stack directories
+- Use `/mnt/nas/data/apps/...` for writable persistent application content
 
-* Use `/mnt/nas/data/apps/...` for writable persistent application content
+- Use `/mnt/nas/backups/...` for backups
 
-* Use `/mnt/nas/backups/...` for backups
+- Use `/mnt/nas/media/...` only for media libraries:
+  - movies
+  - music
+  - TV
+  - photo/media collections
 
-* Use `/mnt/nas/media/...` only for media libraries
+- Do not create application content directly under `/mnt/nas/media`
 
-  * movies
-  * music
-  * TV
-  * photo/media collections
-
-* Do not create application content directly under `/mnt/nas/media`
-
-* Do not place local databases or Redis/Valkey on NFS
-
+- Do not place local databases or Redis/Valkey on NFS
