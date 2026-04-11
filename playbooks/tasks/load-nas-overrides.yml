@@ -40,8 +40,10 @@
       }}
   loop: "{{ nas_override_slurped.results | default([]) }}"
 
-- name: Apply merged NAS override vars
+- name: Apply merged NAS override vars (skip unresolved Jinja strings)
   ansible.builtin.set_fact:
     "{{ item.key }}": "{{ item.value }}"
   loop: "{{ nas_override_vars_merged | dict2items }}"
-  when: (nas_override_vars_merged | length) > 0
+  when:
+    - (nas_override_vars_merged | length) > 0
+    - not (item.value is string and '{{' in item.value and '}}' in item.value)
