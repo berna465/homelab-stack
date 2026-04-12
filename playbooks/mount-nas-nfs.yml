@@ -13,6 +13,7 @@
           - nfs-common
         state: present
         update_cache: true
+        lock_timeout: 600
 
     - name: Ensure NAS mount root exists
       ansible.builtin.file:
