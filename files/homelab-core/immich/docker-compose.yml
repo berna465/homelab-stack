@@ -2,7 +2,7 @@ services:
   immich-server:
     image: ghcr.io/immich-app/immich-server:${IMMICH_VERSION:-release}
     container_name: immich-server
-    user: ${IMMICH_UID_GID:-1000:1000}
+    user: "${IMMICH_UID_GID:-1001:100}"
     restart: unless-stopped
     ports:
       - "${IMMICH_PORT}:2283"
