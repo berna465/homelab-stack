@@ -92,7 +92,7 @@ Run from repo root:
 ansible-playbook playbooks/deploy-all.yml
 ```
 
-This runs provisioning, disk prep, NFS mount, identity prep, NAS structure checks, and then deploys whoami + memos + journiv in sequence.
+This runs provisioning, disk prep, NFS mount, identity prep, NAS structure checks, NAS app-path preparation (create + permission alignment attempts), and then deploys whoami + memos + journiv in sequence.
 
 If `apt/dpkg` is temporarily locked on the VM, the NFS mount step now waits for the package lock timeout instead of failing immediately.
 
@@ -128,14 +128,20 @@ ansible-playbook playbooks/mount-nas-nfs.yml
 ansible-playbook playbooks/prepare-identity-and-permissions.yml
 ```
 
-6. Deploy smoke-test stack
+6. Prepare NAS app paths (create missing directories + verify writability)
+
+```bash
+ansible-playbook playbooks/prepare-app-nas-paths.yml
+```
+
+7. Deploy smoke-test stack
 
 ```bash
 ansible-playbook playbooks/deploy.yml
 curl -i http://192.168.178.210:8080
 ```
 
-7. Deploy app stacks one-by-one
+8. Deploy app stacks one-by-one
 
 ```bash
 ansible-playbook playbooks/deploy-memos.yml

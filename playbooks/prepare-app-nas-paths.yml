@@ -1,0 +1,76 @@
+---
+- name: Prepare app NAS paths and verify writable permissions model
+  hosts: homelab_core
+  gather_facts: false
+  become: false
+  vars_files:
+    - ../group_vars/all.yml
+    - ../group_vars/homelab_core.yml
+  pre_tasks:
+    - name: Load optional NAS group var and secret overrides
+      ansible.builtin.include_tasks: tasks/load-nas-overrides.yml
+      vars:
+        nas_override_var_files:
+          - "{{ nas_config_group_vars_dir }}/all.yml"
+          - "{{ nas_config_group_vars_dir }}/homelab_core.yml"
+          - "{{ nas_config_secrets_dir }}/all.yml"
+          - "{{ nas_config_secrets_dir }}/homelab_core.yml"
+
+  tasks:
+    - name: Prepare deploy user and shared NFS group mapping
+      ansible.builtin.include_tasks: tasks/prepare-vm-identity.yml
+      become: true
+
+    - name: Define required NAS application paths
+      ansible.builtin.set_fact:
+        homelab_required_nas_paths:
+          - label: memos backups
+            path: "{{ memos_exports_dir }}"
+          - label: journiv content
+            path: "{{ journiv_content_dir }}"
+          - label: journiv backups
+            path: "{{ journiv_exports_dir }}"
+
+    - name: Ensure required NAS app paths exist
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: directory
+        mode: '2775'
+      loop: "{{ homelab_required_nas_paths }}"
+      register: homelab_nas_path_create
+      failed_when: false
+
+    - name: Fail with explicit NAS-side guidance when path creation is denied
+      ansible.builtin.fail:
+        msg: >-
+          Required NAS path {{ item.item.path }} ({{ item.item.label }}) could not be created from VM user context.
+          Error: {{ item.msg | default('permission denied') }}.
+          This usually requires NAS-side ACL/export permission changes on QNAP.
+      when: item.failed | default(false)
+      loop: "{{ homelab_nas_path_create.results | default([]) }}"
+
+    - name: Attempt to align NAS path group and mode to shared NFS group
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        group: "{{ homelab_nfs_shared_group_name }}"
+        mode: '2775'
+      loop: "{{ homelab_required_nas_paths }}"
+      register: homelab_nas_permissions_align
+      failed_when: false
+
+    - name: Show NAS permission alignment results
+      ansible.builtin.debug:
+        msg:
+          path: "{{ item.item.path }}"
+          label: "{{ item.item.label }}"
+          changed: "{{ item.changed }}"
+          failed: "{{ item.failed }}"
+          message: "{{ item.msg | default('ok') }}"
+      loop: "{{ homelab_nas_permissions_align.results | default([]) }}"
+
+    - name: Verify required NAS app paths remain writable by deploy user
+      ansible.builtin.include_tasks: tasks/verify-nfs-path-writable.yml
+      vars:
+        nfs_check_label: "{{ item.label }}"
+        nfs_check_path: "{{ item.path }}"
+      loop: "{{ homelab_required_nas_paths }}"
