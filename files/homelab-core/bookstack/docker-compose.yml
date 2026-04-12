@@ -1,0 +1,43 @@
+services:
+  bookstack:
+    image: ${BOOKSTACK_IMAGE}
+    container_name: bookstack
+    restart: unless-stopped
+    ports:
+      - "${BOOKSTACK_PORT}:80"
+    environment:
+      PUID: ${BOOKSTACK_PUID}
+      PGID: ${BOOKSTACK_PGID}
+      TZ: ${BOOKSTACK_TZ}
+      APP_URL: ${BOOKSTACK_APP_URL}
+      DB_HOST: mariadb
+      DB_PORT: 3306
+      DB_DATABASE: ${BOOKSTACK_DB_NAME}
+      DB_USERNAME: ${BOOKSTACK_DB_USER}
+      DB_PASSWORD: ${BOOKSTACK_DB_PASSWORD}
+    volumes:
+      - ${BOOKSTACK_RUNTIME_PATH}:/config
+      - ${BOOKSTACK_CONTENT_PATH}:/config/www/bookstack/storage/uploads
+    depends_on:
+      mariadb:
+        condition: service_healthy
+
+  mariadb:
+    image: ${BOOKSTACK_MARIADB_IMAGE}
+    container_name: bookstack-mariadb
+    restart: unless-stopped
+    environment:
+      PUID: ${BOOKSTACK_PUID}
+      PGID: ${BOOKSTACK_PGID}
+      TZ: ${BOOKSTACK_TZ}
+      MYSQL_ROOT_PASSWORD: ${BOOKSTACK_DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${BOOKSTACK_DB_NAME}
+      MYSQL_USER: ${BOOKSTACK_DB_USER}
+      MYSQL_PASSWORD: ${BOOKSTACK_DB_PASSWORD}
+    volumes:
+      - ${BOOKSTACK_DB_PATH}:/config
+    healthcheck:
+      test: ["CMD", "mariadb-admin", "ping", "-h", "localhost", "-u", "root", "-p${BOOKSTACK_DB_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
