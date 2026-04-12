@@ -49,7 +49,7 @@
 
     - name: Copy bookstack docker-compose definition
       ansible.builtin.copy:
-        src: ../files/homelab-core/bookstack/docker-compose.yml
+        src: ../stacks/bookstack/compose.yaml
         dest: "{{ bookstack_app_dir }}/docker-compose.yml"
         mode: '0644'
 
@@ -63,7 +63,7 @@
 
     - name: Copy bookstack environment file from repo default when NAS override is missing
       ansible.builtin.copy:
-        src: ../files/homelab-core/bookstack/.env.example
+        src: ../stacks/bookstack/.env.example
         dest: "{{ bookstack_app_dir }}/.env"
         mode: '0644'
       when: not (bookstack_nas_env_stat.stat.exists and bookstack_nas_env_stat.stat.isreg)
