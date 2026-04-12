@@ -1,0 +1,15 @@
+services:
+  jellyfin:
+    image: ${JELLYFIN_IMAGE}
+    container_name: jellyfin
+    restart: unless-stopped
+    ports:
+      - "${JELLYFIN_PORT}:8096"
+    environment:
+      - TZ=${JELLYFIN_TZ}
+    volumes:
+      - ${JELLYFIN_CONFIG_PATH}:/config
+      - ${JELLYFIN_CACHE_PATH}:/cache
+      - ${JELLYFIN_MEDIA_MOVIES_PATH}:/media/movies:ro
+      - ${JELLYFIN_MEDIA_TV_PATH}:/media/tv:ro
+      - ${JELLYFIN_MEDIA_MUSIC_PATH}:/media/music:ro

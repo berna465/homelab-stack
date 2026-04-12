@@ -32,6 +32,16 @@
             path: "{{ journiv_content_dir }}"
           - label: journiv backups
             path: "{{ journiv_exports_dir }}"
+          - label: immich content
+            path: "{{ immich_content_dir }}"
+          - label: immich backups
+            path: "{{ immich_exports_dir }}"
+          - label: bookstack content
+            path: "{{ bookstack_content_dir }}"
+          - label: bookstack backups
+            path: "{{ bookstack_exports_dir }}"
+          - label: jellyfin backups
+            path: "{{ jellyfin_exports_dir }}"
 
     - name: Ensure required NAS app paths exist
       ansible.builtin.file:
