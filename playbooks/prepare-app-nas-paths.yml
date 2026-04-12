@@ -18,7 +18,9 @@
 
   tasks:
     - name: Prepare deploy user and shared NFS group mapping
-      ansible.builtin.include_tasks: tasks/prepare-vm-identity.yml
+      block:
+        - name: Include VM identity preparation tasks
+          ansible.builtin.include_tasks: tasks/prepare-vm-identity.yml
       become: true
 
     - name: Define required NAS application paths
