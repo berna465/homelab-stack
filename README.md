@@ -244,11 +244,11 @@ Behavior:
 
 This keeps bootstrap/rebuild functional from the repo alone while allowing environment-specific NAS overrides.
 
-For Immich specifically, `deploy-immich.yml` resolves one runtime env source and symlinks `/data/stacks/immich/.env` to it:
-- preferred source: `/mnt/nas/data/homelab-config/app-env/immich.env`
-- fallback source: `/data/stacks/immich/.env.example`
+For Immich specifically, `deploy-immich.yml` builds runtime `/data/stacks/immich/.env` in two phases:
+- load baseline defaults from `/data/stacks/immich/.env.example`
+- if present, merge `/mnt/nas/data/homelab-config/app-env/immich.env` on top (override precedence)
 
-This removes ambiguity between `.env` and external NAS env values while keeping `.env.example` as the versioned baseline template.
+This keeps `.env.example` as versioned baseline while ensuring NAS runtime overrides win when provided.
 
 ## NAS paths required before deploying new app stacks
 
