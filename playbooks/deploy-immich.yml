@@ -75,8 +75,12 @@
       args:
         chdir: "{{ immich_app_dir }}"
 
-    - name: Verify immich API endpoint returns 200
+    - name: Verify immich API endpoint responds with an accepted status code
       ansible.builtin.uri:
         url: "{{ immich_healthcheck_url }}"
-        status_code: "{{ immich_healthcheck_status }}"
+        status_code: "{{ immich_healthcheck_status_codes }}"
         return_content: false
+      register: immich_health
+      until: immich_health.status in immich_healthcheck_status_codes
+      retries: "{{ immich_healthcheck_retries }}"
+      delay: "{{ immich_healthcheck_delay }}"

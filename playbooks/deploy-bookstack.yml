@@ -73,8 +73,12 @@
       args:
         chdir: "{{ bookstack_app_dir }}"
 
-    - name: Verify bookstack endpoint returns 200
+    - name: Verify bookstack endpoint responds with an accepted status code
       ansible.builtin.uri:
         url: "{{ bookstack_healthcheck_url }}"
-        status_code: "{{ bookstack_healthcheck_status }}"
+        status_code: "{{ bookstack_healthcheck_status_codes }}"
         return_content: false
+      register: bookstack_health
+      until: bookstack_health.status in bookstack_healthcheck_status_codes
+      retries: "{{ bookstack_healthcheck_retries }}"
+      delay: "{{ bookstack_healthcheck_delay }}"

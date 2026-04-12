@@ -62,7 +62,10 @@ immich_cache_dir: "{{ homelab_core_cache_root }}/immich-redis"
 immich_content_dir: "{{ homelab_core_nas_apps_root }}/immich/library"
 immich_exports_dir: "{{ homelab_core_nas_backups_root }}/immich"
 immich_healthcheck_url: http://127.0.0.1:2283/api/server-info
-immich_healthcheck_status: 200
+immich_healthcheck_status_codes:
+  - 200
+immich_healthcheck_retries: 30
+immich_healthcheck_delay: 5
 
 # BookStack settings.
 bookstack_app_dir: "{{ homelab_core_stacks_root }}/bookstack"
@@ -70,8 +73,13 @@ bookstack_runtime_dir: "{{ homelab_core_runtime_root }}/bookstack"
 bookstack_db_dir: "{{ homelab_core_db_root }}/bookstack-mariadb"
 bookstack_content_dir: "{{ homelab_core_nas_apps_root }}/bookstack/uploads"
 bookstack_exports_dir: "{{ homelab_core_nas_backups_root }}/bookstack"
-bookstack_healthcheck_url: http://127.0.0.1:6875/login
-bookstack_healthcheck_status: 200
+bookstack_healthcheck_url: http://127.0.0.1:6875/
+bookstack_healthcheck_status_codes:
+  - 200
+  - 301
+  - 302
+bookstack_healthcheck_retries: 30
+bookstack_healthcheck_delay: 5
 
 # Jellyfin settings.
 jellyfin_app_dir: "{{ homelab_core_stacks_root }}/jellyfin"
