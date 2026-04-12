@@ -128,10 +128,18 @@
             if "IMMICH_MODEL_CACHE_LOCATION" not in override_order:
                 override_order.append("IMMICH_MODEL_CACHE_LOCATION")
 
+        if "ML_CACHE_LOCATION" in override:
+            del override["ML_CACHE_LOCATION"]
+        override_order = [key for key in override_order if key != "ML_CACHE_LOCATION"]
+
         for key in override_order:
             base[key] = override[key]
             if key not in base_order:
                 base_order.append(key)
+
+        if "ML_CACHE_LOCATION" in base:
+            del base["ML_CACHE_LOCATION"]
+        base_order = [key for key in base_order if key != "ML_CACHE_LOCATION"]
 
         lines = [f"{key}={base[key]}" for key in base_order]
         base_path.write_text("\\n".join(lines) + "\\n")
