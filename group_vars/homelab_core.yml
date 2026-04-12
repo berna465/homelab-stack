@@ -14,6 +14,13 @@ homelab_core_nas_apps_root: /mnt/nas/data/apps
 homelab_core_nas_backups_root: /mnt/nas/backups
 homelab_core_nas_media_root: /mnt/nas/media
 
+# VM/NFS identity model defaults (UID/GID semantics matter more than names).
+homelab_vm_deploy_user: debian
+homelab_nfs_shared_group_name: users
+homelab_nfs_shared_group_gid: 100
+# Optional expected deploy user UID for diagnostics (set to null to disable strict comparison).
+homelab_vm_deploy_user_expected_uid: null
+
 # Whoami stack settings.
 homelab_core_app_dir: "{{ homelab_core_stacks_root }}/whoami"
 
@@ -34,7 +41,15 @@ journiv_exports_dir: "{{ homelab_core_nas_backups_root }}/journiv"
 journiv_app_uid: 1000
 journiv_app_gid: 1000
 journiv_healthcheck_url: http://127.0.0.1:8010/
-journiv_healthcheck_status: 200
+# Journiv root may redirect (for example to login); accept common success/redirect HTTP codes.
+journiv_healthcheck_status_codes:
+  - 200
+  - 301
+  - 302
+  - 307
+  - 308
+journiv_healthcheck_retries: 30
+journiv_healthcheck_delay: 5
 
 
 # Optional NAS-hosted app env override files.
