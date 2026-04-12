@@ -152,6 +152,22 @@ ansible-playbook playbooks/deploy-bookstack.yml
 ansible-playbook playbooks/deploy-jellyfin.yml
 ```
 
+### Undeploy app stacks and delete state
+
+The following playbooks stop containers and remove local `/data/...` state plus NAS app/backup state.
+
+```bash
+ansible-playbook playbooks/undeploy-immich.yml
+ansible-playbook playbooks/undeploy-bookstack.yml
+ansible-playbook playbooks/undeploy-jellyfin.yml
+```
+
+You can also run all three in sequence:
+
+```bash
+ansible-playbook playbooks/undeploy-new-apps.yml
+```
+
 ## App conventions
 
 ### whoami
