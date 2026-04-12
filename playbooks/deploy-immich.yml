@@ -61,22 +61,67 @@
         dest: "{{ immich_app_dir }}/.env.example"
         mode: '0644'
 
-    - name: Copy immich environment file from NAS override when available
-      ansible.builtin.copy:
-        src: "{{ immich_nas_env_file }}"
-        dest: "{{ immich_app_dir }}/.env"
-        remote_src: true
-        mode: '0644'
-      when: immich_nas_env_stat.stat.exists and immich_nas_env_stat.stat.isreg
-
-    - name: Copy immich environment file from repo default when NAS override is missing
+    - name: Initialize immich runtime .env from repo default baseline
       ansible.builtin.copy:
         src: ../files/homelab-core/immich/.env.example
         dest: "{{ immich_app_dir }}/.env"
         mode: '0644'
-      when: not (immich_nas_env_stat.stat.exists and immich_nas_env_stat.stat.isreg)
 
-    - name: Validate immich required environment variables are set
+    - name: Validate immich NAS env override is readable by deploy user
+      ansible.builtin.command: "test -r {{ immich_nas_env_file | quote }}"
+      become: false
+      changed_when: false
+      register: immich_nas_env_readable
+      when: immich_nas_env_stat.stat.exists and immich_nas_env_stat.stat.isreg
+
+    - name: Fail when immich NAS env override is not readable
+      ansible.builtin.fail:
+        msg: >-
+          NAS immich env file {{ immich_nas_env_file }} is not readable by deploy user {{ ansible_user | default('unknown') }}.
+          Fix NAS ACL/permissions and re-run deploy.
+      when:
+        - immich_nas_env_stat.stat.exists and immich_nas_env_stat.stat.isreg
+        - immich_nas_env_readable.rc != 0
+
+    - name: Merge NAS immich env override on top of baseline .env
+      ansible.builtin.shell: |
+        set -eu
+        python3 - <<'PY'
+        from pathlib import Path
+
+        base_path = Path("{{ immich_app_dir }}/.env")
+        override_path = Path("{{ immich_nas_env_file }}")
+
+        def parse_env(path):
+            data = {}
+            order = []
+            for line in path.read_text().splitlines():
+                if not line or line.lstrip().startswith("#") or "=" not in line:
+                    continue
+                key, value = line.split("=", 1)
+                key = key.strip()
+                if not key:
+                    continue
+                if key not in data:
+                    order.append(key)
+                data[key] = value
+            return data, order
+
+        base, base_order = parse_env(base_path)
+        override, override_order = parse_env(override_path)
+
+        for key in override_order:
+            base[key] = override[key]
+            if key not in base_order:
+                base_order.append(key)
+
+        lines = [f"{key}={base[key]}" for key in base_order]
+        base_path.write_text("\\n".join(lines) + "\\n")
+        PY
+      changed_when: false
+      when: immich_nas_env_stat.stat.exists and immich_nas_env_stat.stat.isreg
+
+    - name: Validate immich required environment variables are set in runtime .env
       ansible.builtin.shell: |
         set -eu
         required_vars="IMMICH_VERSION IMMICH_REDIS_IMAGE UPLOAD_LOCATION DB_DATA_LOCATION IMMICH_MODEL_CACHE_LOCATION IMMICH_REDIS_PATH DB_USERNAME DB_PASSWORD DB_DATABASE_NAME"
@@ -97,74 +142,12 @@
       failed_when: false
       register: immich_env_check
 
-    - name: Check whether immich postgres data is already initialized
-      ansible.builtin.stat:
-        path: "{{ immich_db_dir }}/PG_VERSION"
-      register: immich_db_initialized
-      when:
-        - immich_env_check.rc != 0
-        - immich_nas_env_stat.stat.exists
-        - immich_nas_env_stat.stat.isreg
-
-    - name: Fail when NAS immich env override is incomplete and DB already exists
+    - name: Fail when immich runtime env source is missing required variables
       ansible.builtin.fail:
         msg: >-
-          NAS override env file {{ immich_nas_env_file }} is incomplete (missing: {{ immich_env_check.stdout_lines | join(', ') }}),
-          and existing postgres data was detected at {{ immich_db_dir }} (PG_VERSION present).
-          Refusing to overwrite .env with defaults because this can cause DB auth mismatches.
-          Fix the NAS immich.env values to match the initialized database credentials, then re-run deploy.
-      when:
-        - immich_env_check.rc != 0
-        - immich_nas_env_stat.stat.exists
-        - immich_nas_env_stat.stat.isreg
-        - immich_db_initialized.stat.exists | default(false)
-
-    - name: Fallback to repo default immich .env when NAS override is incomplete
-      ansible.builtin.copy:
-        src: ../files/homelab-core/immich/.env.example
-        dest: "{{ immich_app_dir }}/.env"
-        mode: '0644'
-      when:
-        - immich_env_check.rc != 0
-        - immich_nas_env_stat.stat.exists
-        - immich_nas_env_stat.stat.isreg
-        - not (immich_db_initialized.stat.exists | default(false))
-
-    - name: Re-validate immich required environment variables after fallback
-      ansible.builtin.shell: |
-        set -eu
-        required_vars="IMMICH_VERSION IMMICH_REDIS_IMAGE UPLOAD_LOCATION DB_DATA_LOCATION IMMICH_MODEL_CACHE_LOCATION IMMICH_REDIS_PATH DB_USERNAME DB_PASSWORD DB_DATABASE_NAME"
-        missing=""
-        for key in $required_vars; do
-          value="$(grep -E "^${key}=" .env | tail -n1 | cut -d'=' -f2- || true)"
-          if [ -z "$value" ]; then
-            missing="$missing $key"
-          fi
-        done
-        if [ -n "$missing" ]; then
-          echo "$missing" | xargs -n1
-          exit 1
-        fi
-      args:
-        chdir: "{{ immich_app_dir }}"
-      changed_when: false
-      failed_when: false
-      register: immich_env_check_final
-      when:
-        - immich_env_check.rc != 0
-        - immich_nas_env_stat.stat.exists
-        - immich_nas_env_stat.stat.isreg
-
-    - name: Set final immich env validation result
-      ansible.builtin.set_fact:
-        immich_env_check_effective: "{{ immich_env_check_final if (immich_env_check_final is defined) else immich_env_check }}"
-
-    - name: Fail when immich .env is still missing required variables
-      ansible.builtin.fail:
-        msg: >-
-          Immich .env at {{ immich_app_dir }}/.env is missing required variables: {{ immich_env_check_effective.stdout_lines | join(', ') }}.
-          Populate the missing values in the NAS override env file ({{ immich_nas_env_file }}) or in files/homelab-core/immich/.env.example before deploy.
-      when: immich_env_check_effective.rc != 0
+          Immich runtime .env at {{ immich_app_dir }}/.env is missing required variables: {{ immich_env_check.stdout_lines | join(', ') }}.
+          Populate required values in files/homelab-core/immich/.env.example defaults and/or NAS override {{ immich_nas_env_file }}.
+      when: immich_env_check.rc != 0
 
     - name: Start immich service with docker compose
       ansible.builtin.command: docker compose up -d
