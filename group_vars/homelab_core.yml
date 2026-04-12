@@ -14,6 +14,13 @@ homelab_core_nas_apps_root: /mnt/nas/data/apps
 homelab_core_nas_backups_root: /mnt/nas/backups
 homelab_core_nas_media_root: /mnt/nas/media
 
+# VM/NFS identity model defaults (UID/GID semantics matter more than names).
+homelab_vm_deploy_user: debian
+homelab_nfs_shared_group_name: users
+homelab_nfs_shared_group_gid: 100
+# Optional expected deploy user UID for diagnostics (set to null to disable strict comparison).
+homelab_vm_deploy_user_expected_uid: null
+
 # Whoami stack settings.
 homelab_core_app_dir: "{{ homelab_core_stacks_root }}/whoami"
 
