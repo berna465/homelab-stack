@@ -99,7 +99,7 @@ If `apt/dpkg` is temporarily locked on the VM, the NFS mount step now waits for 
 
 ### Step-by-step run
 
-1. Provision VM (create-only)
+1. Provision VM (create-only, includes immediate Proxmox root-disk resize to `vm_root_disk_size_gb` when needed)
 
 ```bash
 ansible-playbook playbooks/provision.yml
