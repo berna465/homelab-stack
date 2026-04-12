@@ -1,6 +1,6 @@
 services:
   immich-server:
-    image: ${IMMICH_SERVER_IMAGE}
+    image: ghcr.io/immich-app/immich-server:${IMMICH_VERSION:-release}
     container_name: immich-server
     restart: unless-stopped
     ports:
@@ -8,24 +8,24 @@ services:
     env_file:
       - .env
     volumes:
-      - ${IMMICH_LIBRARY_PATH}:/usr/src/app/upload
+      - ${UPLOAD_LOCATION}:/usr/src/app/upload
     depends_on:
       redis:
         condition: service_healthy
-      postgres:
+      database:
         condition: service_healthy
 
   immich-machine-learning:
-    image: ${IMMICH_ML_IMAGE}
+    image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION:-release}
     container_name: immich-machine-learning
     restart: unless-stopped
     env_file:
       - .env
     volumes:
-      - ${IMMICH_MODEL_CACHE_PATH}:/cache
+      - ${IMMICH_MODEL_CACHE_LOCATION}:/cache
 
   redis:
-    image: ${IMMICH_REDIS_IMAGE}
+    image: redis:6.2-alpine
     container_name: immich-redis
     restart: unless-stopped
     healthcheck:
@@ -36,19 +36,19 @@ services:
     volumes:
       - ${IMMICH_REDIS_PATH}:/data
 
-  postgres:
-    image: ${IMMICH_POSTGRES_IMAGE}
-    container_name: immich-postgres
+  database:
+    image: tensorchord/pgvecto-rs:pg14-v0.3.0
+    container_name: immich-database
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${IMMICH_DB_USER}
-      POSTGRES_PASSWORD: ${IMMICH_DB_PASSWORD}
-      POSTGRES_DB: ${IMMICH_DB_NAME}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_DATABASE_NAME}
       POSTGRES_INITDB_ARGS: --data-checksums
     volumes:
-      - ${IMMICH_POSTGRES_PATH}:/var/lib/postgresql/data
+      - ${DB_DATA_LOCATION}:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${IMMICH_DB_USER} -d ${IMMICH_DB_NAME}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d ${DB_DATABASE_NAME}"]
       interval: 10s
       timeout: 5s
       retries: 5

@@ -79,7 +79,7 @@
     - name: Validate immich required environment variables are set
       ansible.builtin.shell: |
         set -eu
-        required_vars="IMMICH_SERVER_IMAGE IMMICH_ML_IMAGE IMMICH_REDIS_IMAGE IMMICH_POSTGRES_IMAGE IMMICH_POSTGRES_PATH IMMICH_REDIS_PATH IMMICH_MODEL_CACHE_PATH IMMICH_LIBRARY_PATH IMMICH_DB_USER IMMICH_DB_PASSWORD IMMICH_DB_NAME"
+        required_vars="IMMICH_VERSION UPLOAD_LOCATION DB_DATA_LOCATION IMMICH_MODEL_CACHE_LOCATION IMMICH_REDIS_PATH DB_USERNAME DB_PASSWORD DB_DATABASE_NAME"
         missing=""
         for key in $required_vars; do
           value="$(grep -E "^${key}=" .env | tail -n1 | cut -d'=' -f2- || true)"
@@ -110,7 +110,7 @@
     - name: Re-validate immich required environment variables after fallback
       ansible.builtin.shell: |
         set -eu
-        required_vars="IMMICH_SERVER_IMAGE IMMICH_ML_IMAGE IMMICH_REDIS_IMAGE IMMICH_POSTGRES_IMAGE IMMICH_POSTGRES_PATH IMMICH_REDIS_PATH IMMICH_MODEL_CACHE_PATH IMMICH_LIBRARY_PATH IMMICH_DB_USER IMMICH_DB_PASSWORD IMMICH_DB_NAME"
+        required_vars="IMMICH_VERSION UPLOAD_LOCATION DB_DATA_LOCATION IMMICH_MODEL_CACHE_LOCATION IMMICH_REDIS_PATH DB_USERNAME DB_PASSWORD DB_DATABASE_NAME"
         missing=""
         for key in $required_vars; do
           value="$(grep -E "^${key}=" .env | tail -n1 | cut -d'=' -f2- || true)"
