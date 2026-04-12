@@ -1,0 +1,21 @@
+---
+- name: Prepare VM identity model for NAS-backed app writes
+  hosts: homelab_core
+  gather_facts: false
+  become: true
+  vars_files:
+    - ../group_vars/all.yml
+    - ../group_vars/homelab_core.yml
+  pre_tasks:
+    - name: Load optional NAS group var and secret overrides
+      ansible.builtin.include_tasks: tasks/load-nas-overrides.yml
+      vars:
+        nas_override_var_files:
+          - "{{ nas_config_group_vars_dir }}/all.yml"
+          - "{{ nas_config_group_vars_dir }}/homelab_core.yml"
+          - "{{ nas_config_secrets_dir }}/all.yml"
+          - "{{ nas_config_secrets_dir }}/homelab_core.yml"
+
+  tasks:
+    - name: Prepare deploy user and shared NFS group mapping
+      ansible.builtin.include_tasks: tasks/prepare-vm-identity.yml
