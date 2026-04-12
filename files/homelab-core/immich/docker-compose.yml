@@ -1,0 +1,54 @@
+services:
+  immich-server:
+    image: ${IMMICH_SERVER_IMAGE}
+    container_name: immich-server
+    restart: unless-stopped
+    ports:
+      - "${IMMICH_PORT}:2283"
+    env_file:
+      - .env
+    volumes:
+      - ${IMMICH_LIBRARY_PATH}:/usr/src/app/upload
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
+  immich-machine-learning:
+    image: ${IMMICH_ML_IMAGE}
+    container_name: immich-machine-learning
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ${IMMICH_MODEL_CACHE_PATH}:/cache
+
+  redis:
+    image: ${IMMICH_REDIS_IMAGE}
+    container_name: immich-redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - ${IMMICH_REDIS_PATH}:/data
+
+  postgres:
+    image: ${IMMICH_POSTGRES_IMAGE}
+    container_name: immich-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${IMMICH_DB_USER}
+      POSTGRES_PASSWORD: ${IMMICH_DB_PASSWORD}
+      POSTGRES_DB: ${IMMICH_DB_NAME}
+      POSTGRES_INITDB_ARGS: --data-checksums
+    volumes:
+      - ${IMMICH_POSTGRES_PATH}:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${IMMICH_DB_USER} -d ${IMMICH_DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
