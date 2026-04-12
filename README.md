@@ -86,6 +86,16 @@ homelab-stack/
 
 Run from repo root:
 
+### One-command global run (bootstrap + all stacks)
+
+```bash
+ansible-playbook playbooks/deploy-all.yml
+```
+
+This runs provisioning, disk prep, NFS mount, identity prep, NAS structure checks, and then deploys whoami + memos + journiv in sequence.
+
+### Step-by-step run
+
 1. Provision VM (create-only)
 
 ```bash
