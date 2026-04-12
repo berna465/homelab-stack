@@ -25,7 +25,7 @@
 
     - name: Copy docker-compose definition
       ansible.builtin.copy:
-        src: ../files/homelab-core/docker-compose.yml
+        src: ../stacks/whoami/compose.yaml
         dest: "{{ homelab_core_app_dir }}/docker-compose.yml"
         mode: '0644'
 

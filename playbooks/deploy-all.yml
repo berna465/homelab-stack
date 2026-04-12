@@ -1,4 +1,3 @@
 ---
-# Global end-to-end run for single-VM homelab bootstrap + app deploy.
-- import_playbook: compute/provision-base.yml
-- import_playbook: stacks/deploy-all-apps.yml
+# Legacy alias: use ansible/playbooks/site.yml.
+- import_playbook: ../ansible/playbooks/site.yml
