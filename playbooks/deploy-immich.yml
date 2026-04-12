@@ -121,6 +121,13 @@
         base, base_order = parse_env(base_path)
         override, override_order = parse_env(override_path)
 
+        legacy_ml_cache = override.get("ML_CACHE_LOCATION", "").strip()
+        explicit_model_cache = override.get("IMMICH_MODEL_CACHE_LOCATION", "").strip()
+        if legacy_ml_cache and not explicit_model_cache:
+            override["IMMICH_MODEL_CACHE_LOCATION"] = legacy_ml_cache
+            if "IMMICH_MODEL_CACHE_LOCATION" not in override_order:
+                override_order.append("IMMICH_MODEL_CACHE_LOCATION")
+
         for key in override_order:
             base[key] = override[key]
             if key not in base_order:
