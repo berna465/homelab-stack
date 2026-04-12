@@ -55,6 +55,12 @@
         dest: "{{ immich_app_dir }}/docker-compose.yml"
         mode: '0644'
 
+    - name: Copy immich environment example file for local reference
+      ansible.builtin.copy:
+        src: ../files/homelab-core/immich/.env.example
+        dest: "{{ immich_app_dir }}/.env.example"
+        mode: '0644'
+
     - name: Copy immich environment file from NAS override when available
       ansible.builtin.copy:
         src: "{{ immich_nas_env_file }}"
@@ -69,6 +75,34 @@
         dest: "{{ immich_app_dir }}/.env"
         mode: '0644'
       when: not (immich_nas_env_stat.stat.exists and immich_nas_env_stat.stat.isreg)
+
+    - name: Validate immich required environment variables are set
+      ansible.builtin.shell: |
+        set -eu
+        required_vars="IMMICH_SERVER_IMAGE IMMICH_ML_IMAGE IMMICH_REDIS_IMAGE IMMICH_POSTGRES_IMAGE IMMICH_POSTGRES_PATH IMMICH_REDIS_PATH IMMICH_MODEL_CACHE_PATH IMMICH_LIBRARY_PATH IMMICH_DB_USER IMMICH_DB_PASSWORD IMMICH_DB_NAME"
+        missing=""
+        for key in $required_vars; do
+          value="$(grep -E "^${key}=" .env | tail -n1 | cut -d'=' -f2- || true)"
+          if [ -z "$value" ]; then
+            missing="$missing $key"
+          fi
+        done
+        if [ -n "$missing" ]; then
+          echo "$missing" | xargs -n1
+          exit 1
+        fi
+      args:
+        chdir: "{{ immich_app_dir }}"
+      changed_when: false
+      failed_when: false
+      register: immich_env_check
+
+    - name: Fail when immich .env is missing required variables
+      ansible.builtin.fail:
+        msg: >-
+          Immich .env at {{ immich_app_dir }}/.env is missing required variables: {{ immich_env_check.stdout_lines | join(', ') }}.
+          Populate the missing values in the NAS override env file ({{ immich_nas_env_file }}) or in files/homelab-core/immich/.env.example before deploy.
+      when: immich_env_check.rc != 0
 
     - name: Start immich service with docker compose
       ansible.builtin.command: docker compose up -d
