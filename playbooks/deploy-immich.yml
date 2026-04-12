@@ -61,6 +61,17 @@
         dest: "{{ immich_app_dir }}/.env.example"
         mode: '0644'
 
+    - name: Check existing immich runtime .env path type
+      ansible.builtin.stat:
+        path: "{{ immich_app_dir }}/.env"
+      register: immich_runtime_env_stat
+
+    - name: Remove existing immich runtime .env symlink before baseline copy
+      ansible.builtin.file:
+        path: "{{ immich_app_dir }}/.env"
+        state: absent
+      when: immich_runtime_env_stat.stat.islnk | default(false)
+
     - name: Initialize immich runtime .env from repo default baseline
       ansible.builtin.copy:
         src: ../files/homelab-core/immich/.env.example
@@ -124,25 +135,41 @@
     - name: Validate immich required environment variables are set in runtime .env
       ansible.builtin.shell: |
         set -eu
-        required_vars="IMMICH_VERSION IMMICH_REDIS_IMAGE UPLOAD_LOCATION DB_DATA_LOCATION IMMICH_MODEL_CACHE_LOCATION IMMICH_REDIS_PATH DB_USERNAME DB_PASSWORD DB_DATABASE_NAME"
-        missing=""
-        for key in $required_vars; do
-          value="$(grep -E "^${key}=" .env | tail -n1 | cut -d'=' -f2- || true)"
-          if [ -z "$value" ]; then
-            missing="$missing $key"
-          fi
-        done
-        if [ -n "$missing" ]; then
-          echo "$missing" | xargs -n1
-          exit 1
-        fi
+        python3 - <<'PY'
+        from pathlib import Path
+
+        required = [
+            "IMMICH_VERSION",
+            "IMMICH_REDIS_IMAGE",
+            "UPLOAD_LOCATION",
+            "DB_DATA_LOCATION",
+            "IMMICH_MODEL_CACHE_LOCATION",
+            "IMMICH_REDIS_PATH",
+            "DB_USERNAME",
+            "DB_PASSWORD",
+            "DB_DATABASE_NAME",
+        ]
+
+        values = {}
+        for raw_line in Path(".env").read_text().splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            values[key.strip()] = value.strip()
+
+        missing = [key for key in required if not values.get(key)]
+        if missing:
+            print("\\n".join(missing))
+            raise SystemExit(1)
+        PY
       args:
         chdir: "{{ immich_app_dir }}"
       changed_when: false
       failed_when: false
       register: immich_env_check
 
-    - name: Fail when immich runtime env source is missing required variables
+    - name: Fail when immich runtime .env is missing required variables
       ansible.builtin.fail:
         msg: >-
           Immich runtime .env at {{ immich_app_dir }}/.env is missing required variables: {{ immich_env_check.stdout_lines | join(', ') }}.
