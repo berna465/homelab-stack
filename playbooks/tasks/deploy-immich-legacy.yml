@@ -1,0 +1,220 @@
+---
+- name: Ensure immich stack and local persistence directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ immich_app_dir }}"
+    - "{{ immich_runtime_dir }}"
+    - "{{ immich_runtime_dir }}/model-cache"
+    - "{{ immich_db_dir }}"
+    - "{{ immich_cache_dir }}"
+
+- name: Prepare deploy user and shared NFS group mapping
+  ansible.builtin.include_tasks: tasks/prepare-vm-identity.yml
+
+- name: Verify immich NAS content path exists and is writable by deploy identity
+  ansible.builtin.include_tasks: tasks/verify-nfs-path-writable.yml
+  vars:
+    nfs_check_label: immich content path
+    nfs_check_path: "{{ immich_content_dir }}"
+
+- name: Verify immich NAS backups path exists and is writable by deploy identity
+  ansible.builtin.include_tasks: tasks/verify-nfs-path-writable.yml
+  vars:
+    nfs_check_label: immich backups path
+    nfs_check_path: "{{ immich_exports_dir }}"
+
+- name: Copy immich docker-compose definition
+  ansible.builtin.copy:
+    src: ../stacks/immich/compose.yaml
+    dest: "{{ immich_app_dir }}/docker-compose.yml"
+    mode: '0644'
+
+- name: Copy immich environment example file for local reference
+  ansible.builtin.copy:
+    src: ../stacks/immich/.env.example
+    dest: "{{ immich_app_dir }}/.env.example"
+    mode: '0644'
+
+- name: Check existing immich runtime .env path type
+  ansible.builtin.stat:
+    path: "{{ immich_app_dir }}/.env"
+  register: immich_runtime_env_stat
+
+- name: Remove existing immich runtime .env symlink before baseline copy
+  ansible.builtin.file:
+    path: "{{ immich_app_dir }}/.env"
+    state: absent
+  when: immich_runtime_env_stat.stat.islnk | default(false)
+
+- name: Initialize immich runtime .env from repo default baseline
+  ansible.builtin.copy:
+    src: ../stacks/immich/.env.example
+    dest: "{{ immich_app_dir }}/.env"
+    mode: '0644'
+
+- name: Validate immich NAS env override is readable by deploy user
+  ansible.builtin.command: "test -r {{ immich_nas_env_file | quote }}"
+  become: false
+  changed_when: false
+  register: immich_nas_env_readable
+  when: immich_nas_env_stat.stat.exists and immich_nas_env_stat.stat.isreg
+
+- name: Fail when immich NAS env override is not readable
+  ansible.builtin.fail:
+    msg: >-
+      NAS immich env file {{ immich_nas_env_file }} is not readable by deploy user {{ ansible_user | default('unknown') }}.
+      Fix NAS ACL/permissions and re-run deploy.
+  when:
+    - immich_nas_env_stat.stat.exists and immich_nas_env_stat.stat.isreg
+    - immich_nas_env_readable.rc != 0
+
+- name: Merge NAS immich env override on top of baseline .env
+  ansible.builtin.shell: |
+    set -eu
+    python3 - <<'PY'
+    from pathlib import Path
+
+    base_path = Path("{{ immich_app_dir }}/.env")
+    override_path = Path("{{ immich_nas_env_file }}")
+
+    def parse_env(path):
+        data = {}
+        order = []
+        for line in path.read_text().splitlines():
+            if not line or line.lstrip().startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key = key.strip()
+            if not key:
+                continue
+            if key not in data:
+                order.append(key)
+            data[key] = value
+        return data, order
+
+    base, base_order = parse_env(base_path)
+    override, override_order = parse_env(override_path)
+
+    legacy_ml_cache = override.get("ML_CACHE_LOCATION", "").strip()
+    explicit_model_cache = override.get("IMMICH_MODEL_CACHE_LOCATION", "").strip()
+    if legacy_ml_cache and not explicit_model_cache:
+        override["IMMICH_MODEL_CACHE_LOCATION"] = legacy_ml_cache
+        if "IMMICH_MODEL_CACHE_LOCATION" not in override_order:
+            override_order.append("IMMICH_MODEL_CACHE_LOCATION")
+
+    if "ML_CACHE_LOCATION" in override:
+        del override["ML_CACHE_LOCATION"]
+    override_order = [key for key in override_order if key != "ML_CACHE_LOCATION"]
+
+    for key in override_order:
+        base[key] = override[key]
+        if key not in base_order:
+            base_order.append(key)
+
+    if "ML_CACHE_LOCATION" in base:
+        del base["ML_CACHE_LOCATION"]
+    base_order = [key for key in base_order if key != "ML_CACHE_LOCATION"]
+
+    lines = [f"{key}={base[key]}" for key in base_order]
+    base_path.write_text("\n".join(lines) + "\n")
+    PY
+  changed_when: false
+  when: immich_nas_env_stat.stat.exists and immich_nas_env_stat.stat.isreg
+
+- name: Validate immich required environment variables are set in runtime .env
+  ansible.builtin.shell: |
+    set -eu
+    required_vars='IMMICH_VERSION IMMICH_REDIS_IMAGE UPLOAD_LOCATION DB_DATA_LOCATION IMMICH_MODEL_CACHE_LOCATION IMMICH_REDIS_PATH DB_USERNAME DB_PASSWORD DB_DATABASE_NAME'
+    missing=""
+    for key in $required_vars; do
+      if ! awk -F= -v k="$key" '
+        BEGIN { found=0 }
+        $0 ~ /^[[:space:]]*#/ { next }
+        $1 ~ /^[[:space:]]*$/ { next }
+        {
+          gsub(/^[[:space:]]+|[[:space:]]+$/, "", $1)
+          if ($1 == k) {
+            value = substr($0, index($0, "=") + 1)
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
+            if (length(value) > 0) { found=1; exit 0 }
+          }
+        }
+        END { if (!found) exit 1 }
+      ' .env; then
+        missing="${missing}${key}\n"
+      fi
+    done
+
+    if [ -n "$missing" ]; then
+      printf "%b" "$missing"
+      exit 1
+    fi
+  args:
+    chdir: "{{ immich_app_dir }}"
+  changed_when: false
+  failed_when: false
+  register: immich_env_check
+
+- name: Fail when immich runtime .env is missing required variables
+  ansible.builtin.fail:
+    msg: >-
+      Immich runtime .env at {{ immich_app_dir }}/.env is missing required variables: {{ immich_env_check.stdout_lines | join(', ') }}.
+      Populate required values in stacks/immich/.env.example defaults and/or NAS override {{ immich_nas_env_file }}.
+  when: immich_env_check.rc != 0
+
+- name: Read immich upload path from runtime .env
+  ansible.builtin.shell: |
+    set -eu
+    awk -F= '
+      BEGIN { value="" }
+      $0 ~ /^[[:space:]]*#/ { next }
+      {
+        key=$1
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", key)
+        if (key == "UPLOAD_LOCATION") {
+          value=substr($0, index($0, "=") + 1)
+          gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
+          print value
+          exit 0
+        }
+      }
+      END {
+        if (length(value) == 0) exit 1
+      }
+    ' .env
+  args:
+    chdir: "{{ immich_app_dir }}"
+  changed_when: false
+  register: immich_upload_location_read
+
+- name: Fail when immich upload path cannot be read from runtime .env
+  ansible.builtin.fail:
+    msg: >-
+      Could not read UPLOAD_LOCATION from {{ immich_app_dir }}/.env.
+      Ensure the runtime env contains a valid UPLOAD_LOCATION value.
+  when: immich_upload_location_read.rc != 0
+
+- name: Ensure immich upload path exists on NAS and is writable by deploy user
+  ansible.builtin.file:
+    path: "{{ immich_upload_location_read.stdout | trim }}"
+    state: directory
+    mode: '2775'
+  become: false
+
+- name: Start immich service with docker compose
+  ansible.builtin.command: docker compose up -d
+  args:
+    chdir: "{{ immich_app_dir }}"
+
+- name: Verify immich API endpoint responds with an accepted status code
+  ansible.builtin.uri:
+    url: "{{ immich_healthcheck_url }}"
+    status_code: "{{ immich_healthcheck_status_codes }}"
+    return_content: false
+  register: immich_health
+  until: immich_health.status in immich_healthcheck_status_codes
+  retries: "{{ immich_healthcheck_retries }}"
+  delay: "{{ immich_healthcheck_delay }}"

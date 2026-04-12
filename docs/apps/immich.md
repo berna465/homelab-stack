@@ -20,3 +20,8 @@ Immich deploy remains compatible with the existing flow.
 ## Secrets progression
 
 Use `.env` fallback now; migrate selected variables to `*_FILE`/Docker secrets incrementally where support is clear and safe.
+## Deploy implementation
+
+- Default path: `playbooks/deploy-immich.yml` -> `ansible/roles/stack_immich`
+- Fallback path: set `immich_use_role: false` to use legacy task flow.
+
