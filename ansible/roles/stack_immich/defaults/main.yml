@@ -1,0 +1,4 @@
+---
+immich_use_role: true
+immich_allow_legacy_upload_fallback: true
+immich_legacy_content_dir: "{{ homelab_core_nas_apps_root }}/immich/upload"
