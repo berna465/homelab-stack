@@ -46,6 +46,29 @@ For backups, use:
 
 - `/mnt/nas/backups/<app>/...`
 
+## VM/NFS identity model (UID/GID alignment)
+
+NFS write access is validated using numeric identity mapping (UID/GID), not usernames.
+
+Repository defaults define:
+
+- deploy/login user on VM: `homelab_vm_deploy_user` (default `debian`)
+- shared NFS writable group name: `homelab_nfs_shared_group_name` (default `users`)
+- shared NFS writable GID: `homelab_nfs_shared_group_gid` (default `100`)
+
+Automation on the VM can:
+
+- verify deploy user exists
+- ensure the shared group exists with the expected GID
+- ensure deploy user is a member of that shared group
+- print identity diagnostics (`id`, group mapping, supplementary groups)
+- verify NAS-backed paths exist and are writable via write probes as the deploy user context (`become: false`)
+
+Limits (important):
+
+- if NAS path exists but write probes still fail, this is typically NAS-side ACL/NFS export mapping behavior (common on QNAP)
+- playbooks fail clearly and report path + effective VM identity, but they do not attempt to force-fix NAS ACLs from the NFS client side
+
 ## Repository structure
 
 ```text
@@ -87,14 +110,20 @@ ansible-playbook playbooks/prepare-data-disk.yml
 ansible-playbook playbooks/mount-nas-nfs.yml
 ```
 
-5. Deploy smoke-test stack
+5. Prepare VM identity/group mapping for NFS-backed writes
+
+```bash
+ansible-playbook playbooks/prepare-identity-and-permissions.yml
+```
+
+6. Deploy smoke-test stack
 
 ```bash
 ansible-playbook playbooks/deploy.yml
 curl -i http://192.168.178.210:8080
 ```
 
-6. Deploy app stacks one-by-one
+7. Deploy app stacks one-by-one
 
 ```bash
 ansible-playbook playbooks/deploy-memos.yml
@@ -123,7 +152,9 @@ ansible-playbook playbooks/deploy-journiv.yml
 - Writable app content: `/mnt/nas/data/apps/journiv`
 - Backups: `/mnt/nas/backups/journiv`
 
-`deploy-journiv.yml` validates NAS content/backup paths exist and are writable before deployment.
+`deploy-journiv.yml` prepares VM identity/group mapping, then validates NAS content/backup paths with numeric ownership diagnostics and deploy-user write probes before deployment.
+
+`deploy-journiv.yml` healthcheck accepts common success/redirect codes (200/301/302/307/308) because Journiv root may redirect before the app is fully warm.
 
 
 ## Configuration precedence (repo defaults + NAS overrides)
