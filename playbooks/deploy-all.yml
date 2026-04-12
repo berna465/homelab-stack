@@ -10,3 +10,6 @@
 - import_playbook: deploy.yml
 - import_playbook: deploy-memos.yml
 - import_playbook: deploy-journiv.yml
+- import_playbook: deploy-immich.yml
+- import_playbook: deploy-bookstack.yml
+- import_playbook: deploy-jellyfin.yml
