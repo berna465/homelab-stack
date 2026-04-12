@@ -54,6 +54,55 @@
         qm set {{ vm_id }} --sshkeys /tmp/homelab-core.pub
       when: not vm_exists
 
+    - name: Read configured root disk size after clone
+      ansible.builtin.shell: |
+        set -euo pipefail
+        qm config {{ vm_id }} \
+          | awk -F'size=' '/^{{ vm_root_disk_slot }}:/{print $2}' \
+          | awk -F',' '{print $1}' \
+          | sed 's/[[:space:]]//g'
+      args:
+        executable: /bin/bash
+      register: provision_current_root_disk_size
+      changed_when: false
+      when: not vm_exists
+
+    - name: Fail when root disk slot is missing after clone
+      ansible.builtin.fail:
+        msg: "Could not find {{ vm_root_disk_slot }} in VM {{ vm_id }} configuration after clone"
+      when:
+        - not vm_exists
+        - provision_current_root_disk_size.stdout | trim | length == 0
+
+    - name: Set root disk sizing facts for initial provisioning
+      ansible.builtin.set_fact:
+        provision_current_root_disk_size_gb: "{{ (provision_current_root_disk_size.stdout | trim | regex_replace('[^0-9]', '')) | int }}"
+        provision_target_root_disk_size_gb: "{{ (vm_root_disk_size_gb | string | trim | regex_replace('[^0-9]', '')) | int }}"
+      when: not vm_exists
+
+    - name: Fail when requested root disk size would shrink template disk
+      ansible.builtin.fail:
+        msg: >-
+          Requested vm_root_disk_size_gb={{ provision_target_root_disk_size_gb }}G is smaller than
+          cloned disk size {{ provision_current_root_disk_size_gb }}G. Shrinking is not supported.
+      when:
+        - not vm_exists
+        - (provision_target_root_disk_size_gb | int) < (provision_current_root_disk_size_gb | int)
+
+    - name: Resize root disk immediately during provisioning when target is larger
+      ansible.builtin.command: >-
+        qm resize {{ vm_id }} {{ vm_root_disk_slot }} +{{ (provision_target_root_disk_size_gb | int) - (provision_current_root_disk_size_gb | int) }}G
+      when:
+        - not vm_exists
+        - (provision_target_root_disk_size_gb | int) > (provision_current_root_disk_size_gb | int)
+
+    - name: Root disk already at requested size during provisioning
+      ansible.builtin.debug:
+        msg: "Root disk already at {{ provision_current_root_disk_size_gb }}G; no resize needed during provisioning"
+      when:
+        - not vm_exists
+        - (provision_target_root_disk_size_gb | int) == (provision_current_root_disk_size_gb | int)
+
     - name: Start VM
       ansible.builtin.command: "qm start {{ vm_id }}"
       register: vm_start

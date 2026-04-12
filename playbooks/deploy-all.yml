@@ -1,0 +1,12 @@
+---
+# Global end-to-end run for single-VM homelab bootstrap + app deploy.
+- import_playbook: provision.yml
+- import_playbook: attach-data-disk.yml
+- import_playbook: prepare-data-disk.yml
+- import_playbook: mount-nas-nfs.yml
+- import_playbook: prepare-identity-and-permissions.yml
+- import_playbook: prepare-nas-structure.yml
+- import_playbook: prepare-app-nas-paths.yml
+- import_playbook: deploy.yml
+- import_playbook: deploy-memos.yml
+- import_playbook: deploy-journiv.yml

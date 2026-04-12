@@ -13,19 +13,44 @@
           - nfs-common
         state: present
         update_cache: true
+        lock_timeout: 600
 
-    - name: Ensure NAS mount root exists
+    - name: Check NAS mount root status
+      ansible.builtin.stat:
+        path: "{{ nas_nfs_mount_root }}"
+      register: nas_mount_root_stat
+
+    - name: Fail when NAS mount root exists but is not a directory
+      ansible.builtin.fail:
+        msg: "NAS mount root {{ nas_nfs_mount_root }} exists but is not a directory"
+      when: nas_mount_root_stat.stat.exists and not nas_mount_root_stat.stat.isdir
+
+    - name: Ensure NAS mount root exists when missing
       ansible.builtin.file:
         path: "{{ nas_nfs_mount_root }}"
         state: directory
         mode: '0755'
+      when: not nas_mount_root_stat.stat.exists
 
-    - name: Ensure NAS mountpoints exist
-      ansible.builtin.file:
+    - name: Check NAS mountpoints status
+      ansible.builtin.stat:
         path: "{{ item.mountpoint }}"
+      loop: "{{ nas_nfs_mounts }}"
+      register: nas_mountpoint_stats
+
+    - name: Fail when a NAS mountpoint exists but is not a directory
+      ansible.builtin.fail:
+        msg: "NAS mountpoint {{ item.item.mountpoint }} exists but is not a directory"
+      loop: "{{ nas_mountpoint_stats.results }}"
+      when: item.stat.exists and not item.stat.isdir
+
+    - name: Ensure NAS mountpoints exist when missing
+      ansible.builtin.file:
+        path: "{{ item.item.mountpoint }}"
         state: directory
         mode: '0755'
-      loop: "{{ nas_nfs_mounts }}"
+      loop: "{{ nas_mountpoint_stats.results }}"
+      when: not item.stat.exists
 
     - name: Mount NFS shares and persist in fstab
       ansible.posix.mount:
