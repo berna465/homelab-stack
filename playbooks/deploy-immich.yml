@@ -1,0 +1,131 @@
+---
+- name: Deploy immich stack to homelab-core
+  hosts: homelab_core
+  gather_facts: false
+  become: true
+  vars_files:
+    - ../group_vars/all.yml
+    - ../group_vars/homelab_core.yml
+  pre_tasks:
+    - name: Load optional NAS group var and secret overrides
+      ansible.builtin.include_tasks: tasks/load-nas-overrides.yml
+      vars:
+        nas_override_var_files:
+          - "{{ nas_config_group_vars_dir }}/all.yml"
+          - "{{ nas_config_group_vars_dir }}/homelab_core.yml"
+          - "{{ nas_config_secrets_dir }}/all.yml"
+          - "{{ nas_config_secrets_dir }}/homelab_core.yml"
+
+    - name: Check optional immich NAS env override file
+      ansible.builtin.stat:
+        path: "{{ immich_nas_env_file }}"
+      register: immich_nas_env_stat
+
+  tasks:
+    - name: Ensure immich stack and local persistence directories exist
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - "{{ immich_app_dir }}"
+        - "{{ immich_runtime_dir }}"
+        - "{{ immich_runtime_dir }}/model-cache"
+        - "{{ immich_db_dir }}"
+        - "{{ immich_cache_dir }}"
+
+    - name: Prepare deploy user and shared NFS group mapping
+      ansible.builtin.include_tasks: tasks/prepare-vm-identity.yml
+
+    - name: Verify immich NAS content path exists and is writable by deploy identity
+      ansible.builtin.include_tasks: tasks/verify-nfs-path-writable.yml
+      vars:
+        nfs_check_label: immich content path
+        nfs_check_path: "{{ immich_content_dir }}"
+
+    - name: Verify immich NAS backups path exists and is writable by deploy identity
+      ansible.builtin.include_tasks: tasks/verify-nfs-path-writable.yml
+      vars:
+        nfs_check_label: immich backups path
+        nfs_check_path: "{{ immich_exports_dir }}"
+
+    - name: Copy immich docker-compose definition
+      ansible.builtin.copy:
+        src: ../files/homelab-core/immich/docker-compose.yml
+        dest: "{{ immich_app_dir }}/docker-compose.yml"
+        mode: '0644'
+
+    - name: Copy immich environment example file for local reference
+      ansible.builtin.copy:
+        src: ../files/homelab-core/immich/.env.example
+        dest: "{{ immich_app_dir }}/.env.example"
+        mode: '0644'
+
+    - name: Resolve immich runtime env source path
+      ansible.builtin.set_fact:
+        immich_runtime_env_source: >-
+          {{ immich_nas_env_file if (immich_nas_env_stat.stat.exists and immich_nas_env_stat.stat.isreg)
+             else immich_app_dir ~ '/.env.example' }}
+
+    - name: Validate immich runtime env source is readable by deploy user
+      ansible.builtin.command: "test -r {{ immich_runtime_env_source | quote }}"
+      become: false
+      changed_when: false
+      register: immich_runtime_env_readable
+
+    - name: Fail when immich runtime env source is not readable
+      ansible.builtin.fail:
+        msg: >-
+          Runtime env source {{ immich_runtime_env_source }} is not readable by deploy user {{ ansible_user | default('unknown') }}.
+          Fix NAS ACL/permissions and re-run deploy.
+      when: immich_runtime_env_readable.rc != 0
+
+    - name: Validate immich required environment variables are set in runtime env source
+      ansible.builtin.shell: |
+        set -eu
+        required_vars="IMMICH_VERSION IMMICH_REDIS_IMAGE UPLOAD_LOCATION DB_DATA_LOCATION IMMICH_MODEL_CACHE_LOCATION IMMICH_REDIS_PATH DB_USERNAME DB_PASSWORD DB_DATABASE_NAME"
+        missing=""
+        for key in $required_vars; do
+          value="$(grep -E "^${key}=" "{{ immich_runtime_env_source }}" | tail -n1 | cut -d'=' -f2- || true)"
+          if [ -z "$value" ]; then
+            missing="$missing $key"
+          fi
+        done
+        if [ -n "$missing" ]; then
+          echo "$missing" | xargs -n1
+          exit 1
+        fi
+      args:
+        chdir: "{{ immich_app_dir }}"
+      changed_when: false
+      failed_when: false
+      register: immich_env_check
+
+    - name: Fail when immich runtime env source is missing required variables
+      ansible.builtin.fail:
+        msg: >-
+          Immich runtime env source {{ immich_runtime_env_source }} is missing required variables: {{ immich_env_check.stdout_lines | join(', ') }}.
+          Populate the missing values in {{ immich_nas_env_file }} (preferred) or in files/homelab-core/immich/.env.example before deploy.
+      when: immich_env_check.rc != 0
+
+    - name: Ensure immich runtime .env is symlinked to selected env source
+      ansible.builtin.file:
+        src: "{{ immich_runtime_env_source }}"
+        dest: "{{ immich_app_dir }}/.env"
+        state: link
+        force: true
+
+    - name: Start immich service with docker compose
+      ansible.builtin.command: docker compose up -d
+      args:
+        chdir: "{{ immich_app_dir }}"
+
+    - name: Verify immich API endpoint responds with an accepted status code
+      ansible.builtin.uri:
+        url: "{{ immich_healthcheck_url }}"
+        status_code: "{{ immich_healthcheck_status_codes }}"
+        return_content: false
+      register: immich_health
+      until: immich_health.status in immich_healthcheck_status_codes
+      retries: "{{ immich_healthcheck_retries }}"
+      delay: "{{ immich_healthcheck_delay }}"
