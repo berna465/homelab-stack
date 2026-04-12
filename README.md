@@ -93,7 +93,7 @@ Run from repo root:
 ansible-playbook playbooks/deploy-all.yml
 ```
 
-This runs provisioning, disk prep, NFS mount, identity prep, NAS structure checks, NAS app-path preparation (create + permission alignment attempts), and then deploys whoami + memos + journiv in sequence.
+This runs provisioning, disk prep, NFS mount, identity prep, NAS structure checks, NAS app-path preparation (create + permission alignment attempts), and then deploys whoami + memos + journiv + immich + bookstack + jellyfin in sequence.
 
 If `apt/dpkg` is temporarily locked on the VM, the NFS mount step now waits for the package lock timeout instead of failing immediately.
 
@@ -147,6 +147,9 @@ curl -i http://192.168.178.210:8080
 ```bash
 ansible-playbook playbooks/deploy-memos.yml
 ansible-playbook playbooks/deploy-journiv.yml
+ansible-playbook playbooks/deploy-immich.yml
+ansible-playbook playbooks/deploy-bookstack.yml
+ansible-playbook playbooks/deploy-jellyfin.yml
 ```
 
 ## App conventions
@@ -175,6 +178,31 @@ ansible-playbook playbooks/deploy-journiv.yml
 
 `deploy-journiv.yml` healthcheck accepts common success/redirect codes (200/301/302/307/308) because Journiv root may redirect before the app is fully warm.
 
+### immich
+
+- Stack: `/data/stacks/immich`
+- PostgreSQL: `/data/db/immich-postgres`
+- Redis cache: `/data/cache/immich-redis`
+- Runtime/model cache: `/data/runtime/immich`
+- Writable app content: `/mnt/nas/data/apps/immich/library`
+- Backups: `/mnt/nas/backups/immich`
+
+### bookstack
+
+- Stack: `/data/stacks/bookstack`
+- MariaDB: `/data/db/bookstack-mariadb`
+- Runtime/config: `/data/runtime/bookstack`
+- Writable uploads/content: `/mnt/nas/data/apps/bookstack/uploads`
+- Backups: `/mnt/nas/backups/bookstack`
+
+### jellyfin
+
+- Stack: `/data/stacks/jellyfin`
+- Runtime/config: `/data/runtime/jellyfin/config`
+- Cache/transcode: `/data/cache/jellyfin`
+- Media libraries (read-only): `/mnt/nas/media/...`
+- Backups: `/mnt/nas/backups/jellyfin`
+
 
 ## Configuration precedence (repo defaults + NAS overrides)
 
@@ -195,10 +223,20 @@ Behavior:
 
 1. Repo defaults are always loaded.
 2. If NAS override files exist, they are merged on top of defaults.
-3. If NAS app env files exist (`app-env/memos.env`, `app-env/journiv.env`), deploy playbooks use them.
+3. If NAS app env files exist (`app-env/memos.env`, `app-env/journiv.env`, `app-env/immich.env`, `app-env/bookstack.env`, `app-env/jellyfin.env`), deploy playbooks use them.
 4. If NAS overrides are missing, deployment continues with repo defaults.
 
 This keeps bootstrap/rebuild functional from the repo alone while allowing environment-specific NAS overrides.
+
+## NAS paths required before deploying new app stacks
+
+Create and grant VM write access to these NAS directories before deployment:
+
+- Immich: `/mnt/nas/data/apps/immich/library`, `/mnt/nas/backups/immich`
+- BookStack: `/mnt/nas/data/apps/bookstack/uploads`, `/mnt/nas/backups/bookstack`
+- Jellyfin: `/mnt/nas/backups/jellyfin`
+
+Jellyfin media source directories under `/mnt/nas/media/...` should exist and be readable from the VM (they are mounted read-only in compose).
 
 ## Guardrails
 
