@@ -72,16 +72,7 @@ Limits (important):
 
 ## Repository structure
 
-```text
-homelab-stack/
-├── ansible.cfg
-├── inventory/
-├── group_vars/
-├── playbooks/
-├── files/
-├── README.md
-└── AGENTS.md
-```
+See `docs/STRUCTURE.md` for the current logical layout (compute provisioning vs app stacks).
 
 ## Clean rebuild flow
 
@@ -93,7 +84,11 @@ Run from repo root:
 ansible-playbook playbooks/deploy-all.yml
 ```
 
-This runs provisioning, disk prep, NFS mount, identity prep, NAS structure checks, NAS app-path preparation (create + permission alignment attempts), and then deploys whoami + memos + journiv + immich + bookstack + jellyfin in sequence.
+This runs:
+- `playbooks/compute/provision-base.yml` (compute baseline provisioning)
+- `playbooks/stacks/deploy-all-apps.yml` (application stacks deployment)
+
+The root orchestrator remains available for backward compatibility.
 
 If `apt/dpkg` is temporarily locked on the VM, the NFS mount step now waits for the package lock timeout instead of failing immediately.
 
@@ -249,6 +244,13 @@ For Immich specifically, `deploy-immich.yml` builds runtime `/data/stacks/immich
 - if present, merge `/mnt/nas/data/homelab-config/app-env/immich.env` on top (override precedence)
 
 This keeps `.env.example` as versioned baseline while ensuring NAS runtime overrides win when provided.
+
+
+## Variable model and config/secrets docs
+
+- Variable layering (`all.yml` vs `homelab_core.yml`): `docs/VARIABLES.md`
+- Config + secrets strategy (`.env.example`, NAS `app-env`, NAS `secrets`): `docs/CONFIG-SECRETS.md`
+- Operations runbook (provision/deploy/new app/troubleshooting): `docs/OPERATIONS.md`
 
 ## NAS paths required before deploying new app stacks
 

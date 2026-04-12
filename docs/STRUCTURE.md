@@ -1,23 +1,43 @@
-# Struttura homelab-stack
+# Struttura repository (refactor mirato)
 
-- config/
-  - homelab.env           -> configurazione ambiente (vmid, template, bridge, ecc.)
-- secrets/
-  - .gitignore            -> ignora tutti i file di secrets
-- scripts/
-  - proxmox/
-    - stack.sh            -> orchestratore principale da eseguire sul nodo Proxmox
-  - docker/
-    - infra-core/
-      - docker-compose.yml
-      - .env.example
-    - apps-core/
-      - docker-compose.yml
-      - .env.example
+Layout pensato per separare chiaramente:
 
-Idea:
-- Sul nodo Proxmox si clona questo repo.
-- Si modifica config/homelab.env con i propri parametri.
-- Si aggiungono i file .env reali sotto secrets/ (NON in git).
-- Si esegue scripts/proxmox/stack.sh per creare/aggiornare le VM
-  e poi (in futuro) per fare il provisioning automatico dei container.
+1. **provisioning compute/host baseline**
+2. **deploy degli stack applicativi**
+
+## Directory principali
+
+```text
+homelab-stack/
+├── group_vars/
+│   ├── all.yml
+│   └── homelab_core.yml
+├── inventory/
+├── playbooks/
+│   ├── compute/
+│   │   └── provision-base.yml
+│   ├── stacks/
+│   │   ├── deploy-all-apps.yml
+│   │   └── deploy-immich-only.yml
+│   ├── deploy-all.yml
+│   ├── deploy-immich.yml
+│   ├── deploy-journiv.yml
+│   ├── deploy-bookstack.yml
+│   ├── deploy-jellyfin.yml
+│   └── ... (playbook legacy mantenuti per compatibilità)
+├── files/homelab-core/<app>/
+│   ├── docker-compose.yml
+│   └── .env.example
+├── docs/
+│   ├── STRUCTURE.md
+│   ├── VARIABLES.md
+│   ├── CONFIG-SECRETS.md
+│   └── OPERATIONS.md
+└── README.md
+```
+
+## Principio operativo
+
+- `playbooks/compute/*`: prepara host/VM, storage, mount NFS, identity/permessi.
+- `playbooks/stacks/*`: deploy app stack, senza riconfigurare compute.
+- I playbook root esistenti restano usabili per non rompere workflow attuali.
