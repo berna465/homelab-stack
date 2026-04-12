@@ -1,0 +1,104 @@
+# Node/group-specific configuration for homelab_core.
+
+# VM instance details (single-VM setup).
+vm_template_id: 902
+vm_id: 210
+vm_name: homelab-core
+vm_cores: 4
+vm_memory: 4096
+vm_bridge: vmbr0
+vm_ci_user: debian
+vm_ipconfig0: ip=192.168.178.210/24,gw=192.168.178.1
+
+# Public key used by cloud-init for the VM user.
+# Override this value with your own key before running provision.
+vm_ssh_public_key: "{{ lookup('file', lookup('env', 'HOME') + '/.ssh/id_rsa.pub') }}"
+
+# Service endpoint checks for the whoami smoke-test stack.
+homelab_core_healthcheck_url: http://127.0.0.1:8080
+homelab_core_healthcheck_status: 200
+
+# Local runtime paths on /data.
+homelab_core_stacks_root: /data/stacks
+homelab_core_runtime_root: /data/runtime
+homelab_core_db_root: /data/db
+homelab_core_cache_root: /data/cache
+
+# NAS paths for this host.
+homelab_core_nas_data_root: "{{ nas_nfs_mount_root }}/data"
+homelab_core_nas_apps_root: "{{ homelab_core_nas_data_root }}/apps"
+homelab_core_nas_backups_root: "{{ nas_nfs_mount_root }}/backups"
+homelab_core_nas_media_root: "{{ nas_nfs_mount_root }}/media"
+
+# Whoami stack settings.
+homelab_core_app_dir: "{{ homelab_core_stacks_root }}/whoami"
+
+# Memos stack settings.
+memos_app_dir: "{{ homelab_core_stacks_root }}/memos"
+memos_data_dir: "{{ homelab_core_runtime_root }}/memos"
+memos_exports_dir: "{{ homelab_core_nas_backups_root }}/memos"
+memos_healthcheck_url: http://127.0.0.1:5230
+memos_healthcheck_status: 200
+
+# Journiv stack settings.
+journiv_app_dir: "{{ homelab_core_stacks_root }}/journiv"
+journiv_runtime_dir: "{{ homelab_core_runtime_root }}/journiv"
+journiv_db_dir: "{{ homelab_core_db_root }}/journiv-postgres"
+journiv_cache_dir: "{{ homelab_core_cache_root }}/journiv-valkey"
+journiv_content_dir: "{{ homelab_core_nas_apps_root }}/journiv"
+journiv_exports_dir: "{{ homelab_core_nas_backups_root }}/journiv"
+journiv_app_uid: 1000
+journiv_app_gid: 1000
+journiv_healthcheck_url: http://127.0.0.1:8010/
+# Journiv root may redirect (for example to login); accept common success/redirect HTTP codes.
+journiv_healthcheck_status_codes:
+  - 200
+  - 301
+  - 302
+  - 307
+  - 308
+journiv_healthcheck_retries: 30
+journiv_healthcheck_delay: 5
+
+# Immich stack settings.
+immich_app_dir: "{{ homelab_core_stacks_root }}/immich"
+immich_runtime_dir: "{{ homelab_core_runtime_root }}/immich"
+immich_db_dir: "{{ homelab_core_db_root }}/immich-postgres"
+immich_cache_dir: "{{ homelab_core_cache_root }}/immich-redis"
+immich_content_dir: "{{ homelab_core_nas_apps_root }}/immich/library"
+immich_exports_dir: "{{ homelab_core_nas_backups_root }}/immich"
+immich_healthcheck_url: http://127.0.0.1:2283/api/server-info
+immich_healthcheck_status_codes:
+  - 200
+immich_healthcheck_retries: 30
+immich_healthcheck_delay: 5
+
+# BookStack settings.
+bookstack_app_dir: "{{ homelab_core_stacks_root }}/bookstack"
+bookstack_runtime_dir: "{{ homelab_core_runtime_root }}/bookstack"
+bookstack_db_dir: "{{ homelab_core_db_root }}/bookstack-mariadb"
+bookstack_content_dir: "{{ homelab_core_nas_apps_root }}/bookstack/uploads"
+bookstack_exports_dir: "{{ homelab_core_nas_backups_root }}/bookstack"
+bookstack_healthcheck_url: http://127.0.0.1:6875/
+bookstack_healthcheck_status_codes:
+  - 200
+  - 301
+  - 302
+bookstack_healthcheck_retries: 30
+bookstack_healthcheck_delay: 5
+
+# Jellyfin settings.
+jellyfin_app_dir: "{{ homelab_core_stacks_root }}/jellyfin"
+jellyfin_runtime_dir: "{{ homelab_core_runtime_root }}/jellyfin"
+jellyfin_cache_dir: "{{ homelab_core_cache_root }}/jellyfin"
+jellyfin_media_root_dir: "{{ homelab_core_nas_media_root }}"
+jellyfin_exports_dir: "{{ homelab_core_nas_backups_root }}/jellyfin"
+jellyfin_healthcheck_url: http://127.0.0.1:8096/health
+jellyfin_healthcheck_status: 200
+
+# Optional NAS-hosted app env override files.
+memos_nas_env_file: "{{ nas_config_app_env_dir }}/memos.env"
+journiv_nas_env_file: "{{ nas_config_app_env_dir }}/journiv.env"
+immich_nas_env_file: "{{ nas_config_app_env_dir }}/immich.env"
+bookstack_nas_env_file: "{{ nas_config_app_env_dir }}/bookstack.env"
+jellyfin_nas_env_file: "{{ nas_config_app_env_dir }}/jellyfin.env"

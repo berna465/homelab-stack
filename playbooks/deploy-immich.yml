@@ -51,13 +51,13 @@
 
     - name: Copy immich docker-compose definition
       ansible.builtin.copy:
-        src: ../files/homelab-core/immich/docker-compose.yml
+        src: ../stacks/immich/compose.yaml
         dest: "{{ immich_app_dir }}/docker-compose.yml"
         mode: '0644'
 
     - name: Copy immich environment example file for local reference
       ansible.builtin.copy:
-        src: ../files/homelab-core/immich/.env.example
+        src: ../stacks/immich/.env.example
         dest: "{{ immich_app_dir }}/.env.example"
         mode: '0644'
 
@@ -74,7 +74,7 @@
 
     - name: Initialize immich runtime .env from repo default baseline
       ansible.builtin.copy:
-        src: ../files/homelab-core/immich/.env.example
+        src: ../stacks/immich/.env.example
         dest: "{{ immich_app_dir }}/.env"
         mode: '0644'
 
@@ -185,7 +185,7 @@
       ansible.builtin.fail:
         msg: >-
           Immich runtime .env at {{ immich_app_dir }}/.env is missing required variables: {{ immich_env_check.stdout_lines | join(', ') }}.
-          Populate required values in files/homelab-core/immich/.env.example defaults and/or NAS override {{ immich_nas_env_file }}.
+          Populate required values in stacks/immich/.env.example defaults and/or NAS override {{ immich_nas_env_file }}.
       when: immich_env_check.rc != 0
 
     - name: Read immich upload path from runtime .env

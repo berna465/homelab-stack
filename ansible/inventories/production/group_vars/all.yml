@@ -1,0 +1,50 @@
+# Global defaults and cross-host conventions.
+
+# Project-level infrastructure defaults.
+proxmox_node_host: proxmox.home.bernardolab.it
+
+# Dedicated local data disk settings (shared storage convention).
+vm_data_disk_slot: scsi1
+vm_data_disk_storage: local-lvm
+vm_data_disk_size_gb: 150
+
+# Set to an explicit device path (for example /dev/sdb) to skip auto-detection.
+vm_data_disk_device: ''
+vm_data_disk_filesystem: ext4
+vm_data_mount_point: /data
+vm_data_subdirectories:
+  - stacks
+  - db
+  - cache
+  - runtime
+  - backups-local
+
+# Root disk sizing baseline for container image pulls and runtime overhead.
+vm_root_disk_slot: scsi0
+vm_root_disk_size_gb: 16
+
+# NAS NFS settings (replace placeholders with your NAS exports).
+nas_nfs_server: nas.home.bernardolab.it
+nas_nfs_mount_root: /mnt/nas
+nas_nfs_mounts:
+  - export: /DATA
+    mountpoint: "{{ nas_nfs_mount_root }}/data"
+  - export: /Backups
+    mountpoint: "{{ nas_nfs_mount_root }}/backups"
+  - export: /Media
+    mountpoint: "{{ nas_nfs_mount_root }}/media"
+  - export: /Clouds
+    mountpoint: "{{ nas_nfs_mount_root }}/clouds"
+
+# VM/NFS identity model defaults (UID/GID semantics matter more than names).
+homelab_vm_deploy_user: debian
+homelab_nfs_shared_group_name: users
+homelab_nfs_shared_group_gid: 100
+# Optional expected deploy user UID for diagnostics (set to null to disable strict comparison).
+homelab_vm_deploy_user_expected_uid: null
+
+# Optional NAS-hosted configuration overrides (loaded on the VM when available).
+nas_config_root: "{{ nas_nfs_mount_root }}/data/homelab-config"
+nas_config_group_vars_dir: "{{ nas_config_root }}/group_vars"
+nas_config_secrets_dir: "{{ nas_config_root }}/secrets"
+nas_config_app_env_dir: "{{ nas_config_root }}/app-env"
