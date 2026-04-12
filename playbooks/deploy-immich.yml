@@ -97,6 +97,28 @@
       failed_when: false
       register: immich_env_check
 
+    - name: Check whether immich postgres data is already initialized
+      ansible.builtin.stat:
+        path: "{{ immich_db_dir }}/PG_VERSION"
+      register: immich_db_initialized
+      when:
+        - immich_env_check.rc != 0
+        - immich_nas_env_stat.stat.exists
+        - immich_nas_env_stat.stat.isreg
+
+    - name: Fail when NAS immich env override is incomplete and DB already exists
+      ansible.builtin.fail:
+        msg: >-
+          NAS override env file {{ immich_nas_env_file }} is incomplete (missing: {{ immich_env_check.stdout_lines | join(', ') }}),
+          and existing postgres data was detected at {{ immich_db_dir }} (PG_VERSION present).
+          Refusing to overwrite .env with defaults because this can cause DB auth mismatches.
+          Fix the NAS immich.env values to match the initialized database credentials, then re-run deploy.
+      when:
+        - immich_env_check.rc != 0
+        - immich_nas_env_stat.stat.exists
+        - immich_nas_env_stat.stat.isreg
+        - immich_db_initialized.stat.exists | default(false)
+
     - name: Fallback to repo default immich .env when NAS override is incomplete
       ansible.builtin.copy:
         src: ../files/homelab-core/immich/.env.example
@@ -106,6 +128,7 @@
         - immich_env_check.rc != 0
         - immich_nas_env_stat.stat.exists
         - immich_nas_env_stat.stat.isreg
+        - not (immich_db_initialized.stat.exists | default(false))
 
     - name: Re-validate immich required environment variables after fallback
       ansible.builtin.shell: |
