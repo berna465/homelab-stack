@@ -58,6 +58,48 @@
         path: "{{ nas_apps_root }}"
         state: directory
 
+    - name: Define required NAS directories for app stacks
+      ansible.builtin.set_fact:
+        nas_required_app_directories:
+          - label: journiv content
+            path: "{{ nas_apps_root }}/journiv"
+          - label: immich content root
+            path: "{{ nas_apps_root }}/immich"
+          - label: immich library
+            path: "{{ nas_apps_root }}/immich/library"
+          - label: bookstack content root
+            path: "{{ nas_apps_root }}/bookstack"
+          - label: bookstack uploads
+            path: "{{ nas_apps_root }}/bookstack/uploads"
+          - label: memos backups
+            path: "{{ nas_backups_root }}/memos"
+          - label: journiv backups
+            path: "{{ nas_backups_root }}/journiv"
+          - label: immich backups
+            path: "{{ nas_backups_root }}/immich"
+          - label: bookstack backups
+            path: "{{ nas_backups_root }}/bookstack"
+          - label: jellyfin backups
+            path: "{{ nas_backups_root }}/jellyfin"
+
+    - name: Ensure required NAS directories for app stacks exist
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: directory
+        mode: '2775'
+      loop: "{{ nas_required_app_directories }}"
+      register: nas_required_dirs_create
+      failed_when: false
+
+    - name: Fail with explicit NAS guidance when required app directory cannot be created
+      ansible.builtin.fail:
+        msg: >-
+          Required NAS directory {{ item.item.path }} ({{ item.item.label }}) could not be created
+          from VM user context. Error: {{ item.msg | default('permission denied') }}.
+          Create this directory on NAS and grant write permissions for the VM deploy identity.
+      when: item.failed | default(false)
+      loop: "{{ nas_required_dirs_create.results | default([]) }}"
+
     - name: Verify NAS data root is writable
       ansible.builtin.copy:
         content: "ansible-write-test\n"
