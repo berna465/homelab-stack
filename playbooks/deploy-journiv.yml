@@ -130,12 +130,12 @@
       args:
         chdir: "{{ journiv_app_dir }}"
 
-    - name: Verify journiv endpoint returns 200
+    - name: Verify journiv endpoint responds with an accepted status code
       ansible.builtin.uri:
         url: "{{ journiv_healthcheck_url }}"
-        status_code: "{{ journiv_healthcheck_status }}"
+        status_code: "{{ journiv_healthcheck_status_codes }}"
         return_content: false
       register: journiv_health
-      until: journiv_health.status == journiv_healthcheck_status
-      retries: 20
-      delay: 5
+      until: journiv_health.status in journiv_healthcheck_status_codes
+      retries: "{{ journiv_healthcheck_retries }}"
+      delay: "{{ journiv_healthcheck_delay }}"

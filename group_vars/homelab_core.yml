@@ -41,7 +41,15 @@ journiv_exports_dir: "{{ homelab_core_nas_backups_root }}/journiv"
 journiv_app_uid: 1000
 journiv_app_gid: 1000
 journiv_healthcheck_url: http://127.0.0.1:8010/
-journiv_healthcheck_status: 200
+# Journiv root may redirect (for example to login); accept common success/redirect HTTP codes.
+journiv_healthcheck_status_codes:
+  - 200
+  - 301
+  - 302
+  - 307
+  - 308
+journiv_healthcheck_retries: 30
+journiv_healthcheck_delay: 5
 
 
 # Optional NAS-hosted app env override files.

@@ -154,6 +154,8 @@ ansible-playbook playbooks/deploy-journiv.yml
 
 `deploy-journiv.yml` prepares VM identity/group mapping, then validates NAS content/backup paths with numeric ownership diagnostics and deploy-user write probes before deployment.
 
+`deploy-journiv.yml` healthcheck accepts common success/redirect codes (200/301/302/307/308) because Journiv root may redirect before the app is fully warm.
+
 
 ## Configuration precedence (repo defaults + NAS overrides)
 
