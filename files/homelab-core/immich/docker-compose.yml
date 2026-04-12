@@ -23,7 +23,7 @@ services:
     env_file:
       - .env
     volumes:
-      - ${IMMICH_MODEL_CACHE_LOCATION}:/cache
+      - model-cache:/cache
 
   redis:
     image: ${IMMICH_REDIS_IMAGE:-redis:7.4-alpine}
@@ -53,3 +53,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+volumes:
+  model-cache:
