@@ -1,0 +1,84 @@
+---
+- name: Deploy bookstack stack to homelab-core
+  hosts: homelab_core
+  gather_facts: false
+  become: true
+  vars_files:
+    - ../group_vars/all.yml
+    - ../group_vars/homelab_core.yml
+  pre_tasks:
+    - name: Load optional NAS group var and secret overrides
+      ansible.builtin.include_tasks: tasks/load-nas-overrides.yml
+      vars:
+        nas_override_var_files:
+          - "{{ nas_config_group_vars_dir }}/all.yml"
+          - "{{ nas_config_group_vars_dir }}/homelab_core.yml"
+          - "{{ nas_config_secrets_dir }}/all.yml"
+          - "{{ nas_config_secrets_dir }}/homelab_core.yml"
+
+    - name: Check optional bookstack NAS env override file
+      ansible.builtin.stat:
+        path: "{{ bookstack_nas_env_file }}"
+      register: bookstack_nas_env_stat
+
+  tasks:
+    - name: Ensure bookstack stack and local persistence directories exist
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - "{{ bookstack_app_dir }}"
+        - "{{ bookstack_runtime_dir }}"
+        - "{{ bookstack_db_dir }}"
+
+    - name: Prepare deploy user and shared NFS group mapping
+      ansible.builtin.include_tasks: tasks/prepare-vm-identity.yml
+
+    - name: Verify bookstack NAS content path exists and is writable by deploy identity
+      ansible.builtin.include_tasks: tasks/verify-nfs-path-writable.yml
+      vars:
+        nfs_check_label: bookstack content path
+        nfs_check_path: "{{ bookstack_content_dir }}"
+
+    - name: Verify bookstack NAS backups path exists and is writable by deploy identity
+      ansible.builtin.include_tasks: tasks/verify-nfs-path-writable.yml
+      vars:
+        nfs_check_label: bookstack backups path
+        nfs_check_path: "{{ bookstack_exports_dir }}"
+
+    - name: Copy bookstack docker-compose definition
+      ansible.builtin.copy:
+        src: ../files/homelab-core/bookstack/docker-compose.yml
+        dest: "{{ bookstack_app_dir }}/docker-compose.yml"
+        mode: '0644'
+
+    - name: Copy bookstack environment file from NAS override when available
+      ansible.builtin.copy:
+        src: "{{ bookstack_nas_env_file }}"
+        dest: "{{ bookstack_app_dir }}/.env"
+        remote_src: true
+        mode: '0644'
+      when: bookstack_nas_env_stat.stat.exists and bookstack_nas_env_stat.stat.isreg
+
+    - name: Copy bookstack environment file from repo default when NAS override is missing
+      ansible.builtin.copy:
+        src: ../files/homelab-core/bookstack/.env.example
+        dest: "{{ bookstack_app_dir }}/.env"
+        mode: '0644'
+      when: not (bookstack_nas_env_stat.stat.exists and bookstack_nas_env_stat.stat.isreg)
+
+    - name: Start bookstack service with docker compose
+      ansible.builtin.command: docker compose up -d
+      args:
+        chdir: "{{ bookstack_app_dir }}"
+
+    - name: Verify bookstack endpoint responds with an accepted status code
+      ansible.builtin.uri:
+        url: "{{ bookstack_healthcheck_url }}"
+        status_code: "{{ bookstack_healthcheck_status_codes }}"
+        return_content: false
+      register: bookstack_health
+      until: bookstack_health.status in bookstack_healthcheck_status_codes
+      retries: "{{ bookstack_healthcheck_retries }}"
+      delay: "{{ bookstack_healthcheck_delay }}"
