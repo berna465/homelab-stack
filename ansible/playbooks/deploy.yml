@@ -1,0 +1,8 @@
+---
+# Canonical application stack deployment entrypoint.
+- import_playbook: ../../playbooks/deploy.yml
+- import_playbook: ../../playbooks/deploy-memos.yml
+- import_playbook: ../../playbooks/deploy-journiv.yml
+- import_playbook: ../../playbooks/deploy-immich.yml
+- import_playbook: ../../playbooks/deploy-bookstack.yml
+- import_playbook: ../../playbooks/deploy-jellyfin.yml

@@ -1,8 +1,3 @@
 ---
-# Application stack deploy only (assumes compute provisioning already done).
-- import_playbook: ../deploy.yml
-- import_playbook: ../deploy-memos.yml
-- import_playbook: ../deploy-journiv.yml
-- import_playbook: ../deploy-immich.yml
-- import_playbook: ../deploy-bookstack.yml
-- import_playbook: ../deploy-jellyfin.yml
+# Legacy alias: use ansible/playbooks/deploy.yml.
+- import_playbook: ../../ansible/playbooks/deploy.yml

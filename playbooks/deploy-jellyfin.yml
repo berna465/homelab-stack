@@ -56,7 +56,7 @@
 
     - name: Copy jellyfin docker-compose definition
       ansible.builtin.copy:
-        src: ../files/homelab-core/jellyfin/docker-compose.yml
+        src: ../stacks/jellyfin/compose.yaml
         dest: "{{ jellyfin_app_dir }}/docker-compose.yml"
         mode: '0644'
 
@@ -70,7 +70,7 @@
 
     - name: Copy jellyfin environment file from repo default when NAS override is missing
       ansible.builtin.copy:
-        src: ../files/homelab-core/jellyfin/.env.example
+        src: ../stacks/jellyfin/.env.example
         dest: "{{ jellyfin_app_dir }}/.env"
         mode: '0644'
       when: not (jellyfin_nas_env_stat.stat.exists and jellyfin_nas_env_stat.stat.isreg)
