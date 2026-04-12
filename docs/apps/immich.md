@@ -25,3 +25,10 @@ Use `.env` fallback now; migrate selected variables to `*_FILE`/Docker secrets i
 - Default path: `playbooks/deploy-immich.yml` -> `ansible/roles/stack_immich`
 - Fallback path: set `immich_use_role: false` to use legacy task flow.
 
+
+## Content path policy
+
+- Canonical host-side path: `/mnt/nas/data/apps/immich/library`
+- Compatibility fallback (auto-detected by role): `/mnt/nas/data/apps/immich/upload`
+
+Direction is `library`; keep `upload` only as temporary bridge during migration.

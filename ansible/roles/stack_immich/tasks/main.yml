@@ -19,11 +19,45 @@
 - name: Prepare deploy user and shared NFS group mapping
   ansible.builtin.include_tasks: "{{ playbook_dir }}/tasks/prepare-vm-identity.yml"
 
+
+- name: Check canonical immich content path state
+  ansible.builtin.stat:
+    path: "{{ immich_content_dir }}"
+  register: immich_content_dir_stat
+
+- name: Check legacy immich upload path state
+  ansible.builtin.stat:
+    path: "{{ immich_legacy_content_dir }}"
+  register: immich_legacy_content_dir_stat
+  when: immich_allow_legacy_upload_fallback | bool
+
+- name: Resolve effective immich content path
+  ansible.builtin.set_fact:
+    immich_effective_content_dir: >-
+      {{
+        immich_content_dir
+        if (immich_content_dir_stat.stat.exists | default(false))
+        else (
+          immich_legacy_content_dir
+          if (immich_allow_legacy_upload_fallback | bool and (immich_legacy_content_dir_stat.stat.exists | default(false)))
+          else immich_content_dir
+        )
+      }}
+
+- name: Warn when legacy immich upload path fallback is used
+  ansible.builtin.debug:
+    msg: >-
+      Canonical Immich content path is {{ immich_content_dir }},
+      but it is missing. Falling back to legacy path {{ immich_legacy_content_dir }} for compatibility.
+      Create/migrate to {{ immich_content_dir }} when ready.
+  when:
+    - immich_effective_content_dir == immich_legacy_content_dir
+
 - name: Verify immich NAS content path exists and is writable by deploy identity
   ansible.builtin.include_tasks: "{{ playbook_dir }}/tasks/verify-nfs-path-writable.yml"
   vars:
     nfs_check_label: immich content path
-    nfs_check_path: "{{ immich_content_dir }}"
+    nfs_check_path: "{{ immich_effective_content_dir }}"
 
 - name: Verify immich NAS backups path exists and is writable by deploy identity
   ansible.builtin.include_tasks: "{{ playbook_dir }}/tasks/verify-nfs-path-writable.yml"
@@ -128,6 +162,38 @@
     PY
   changed_when: false
   when: immich_nas_env_stat.stat.exists and immich_nas_env_stat.stat.isreg
+
+- name: Align runtime UPLOAD_LOCATION with resolved immich content path
+  ansible.builtin.shell: |
+    set -eu
+    python3 - <<'PY'
+    from pathlib import Path
+
+    env_path = Path("{{ immich_app_dir }}/.env")
+    target = "{{ immich_effective_content_dir }}"
+
+    lines = env_path.read_text().splitlines()
+    out = []
+    found = False
+
+    for line in lines:
+      if line.lstrip().startswith("#") or "=" not in line:
+        out.append(line)
+        continue
+      key, _ = line.split("=", 1)
+      key = key.strip()
+      if key == "UPLOAD_LOCATION":
+        out.append(f"UPLOAD_LOCATION={target}")
+        found = True
+      else:
+        out.append(line)
+
+    if not found:
+      out.append(f"UPLOAD_LOCATION={target}")
+
+    env_path.write_text("\n".join(out) + "\n")
+    PY
+  changed_when: false
 
 - name: Validate immich required environment variables are set in runtime .env
   ansible.builtin.shell: |
