@@ -45,6 +45,15 @@ ansible-playbook ansible/playbooks/deploy.yml
 ansible-playbook ansible/playbooks/site.yml
 ```
 
+### Resize root disk (step separato, se necessario)
+
+Per evitare problemi durante la creazione VM, l'allargamento del root filesystem non viene eseguito nel provisioning iniziale.
+Eseguilo come step successivo esplicito:
+
+```bash
+ansible-playbook playbooks/resize-root-disk.yml
+```
+
 ### Alias legacy ancora validi
 
 - `playbooks/compute/provision-base.yml`

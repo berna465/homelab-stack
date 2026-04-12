@@ -3,22 +3,6 @@
 # Project-level infrastructure defaults.
 proxmox_node_host: proxmox.home.bernardolab.it
 
-# Dedicated local data disk settings (shared storage convention).
-vm_data_disk_slot: scsi1
-vm_data_disk_storage: local-lvm
-vm_data_disk_size_gb: 150
-
-# Set to an explicit device path (for example /dev/sdb) to skip auto-detection.
-vm_data_disk_device: ''
-vm_data_disk_filesystem: ext4
-vm_data_mount_point: /data
-vm_data_subdirectories:
-  - stacks
-  - db
-  - cache
-  - runtime
-  - backups-local
-
 # Root disk sizing baseline for container image pulls and runtime overhead.
 vm_root_disk_slot: scsi0
 vm_root_disk_size_gb: 16

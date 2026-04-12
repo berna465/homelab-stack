@@ -10,6 +10,22 @@ vm_bridge: vmbr0
 vm_ci_user: debian
 vm_ipconfig0: ip=192.168.178.210/24,gw=192.168.178.1
 
+# Dedicated local data disk settings (host-specific for homelab_core).
+vm_data_disk_slot: scsi1
+vm_data_disk_storage: local-lvm
+vm_data_disk_size_gb: 150
+
+# Set to an explicit device path (for example /dev/sdb) to skip auto-detection.
+vm_data_disk_device: ''
+vm_data_disk_filesystem: ext4
+vm_data_mount_point: /data
+vm_data_subdirectories:
+  - stacks
+  - db
+  - cache
+  - runtime
+  - backups-local
+
 # Public key used by cloud-init for the VM user.
 # Override this value with your own key before running provision.
 vm_ssh_public_key: "{{ lookup('file', lookup('env', 'HOME') + '/.ssh/id_rsa.pub') }}"
