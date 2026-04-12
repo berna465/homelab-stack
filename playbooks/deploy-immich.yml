@@ -188,6 +188,45 @@
           Populate required values in files/homelab-core/immich/.env.example defaults and/or NAS override {{ immich_nas_env_file }}.
       when: immich_env_check.rc != 0
 
+    - name: Read immich upload path from runtime .env
+      ansible.builtin.shell: |
+        set -eu
+        awk -F= '
+          BEGIN { value="" }
+          $0 ~ /^[[:space:]]*#/ { next }
+          {
+            key=$1
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", key)
+            if (key == "UPLOAD_LOCATION") {
+              value=substr($0, index($0, "=") + 1)
+              gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
+              print value
+              exit 0
+            }
+          }
+          END {
+            if (length(value) == 0) exit 1
+          }
+        ' .env
+      args:
+        chdir: "{{ immich_app_dir }}"
+      changed_when: false
+      register: immich_upload_location_read
+
+    - name: Fail when immich upload path cannot be read from runtime .env
+      ansible.builtin.fail:
+        msg: >-
+          Could not read UPLOAD_LOCATION from {{ immich_app_dir }}/.env.
+          Ensure the runtime env contains a valid UPLOAD_LOCATION value.
+      when: immich_upload_location_read.rc != 0
+
+    - name: Ensure immich upload path exists on NAS and is writable by deploy user
+      ansible.builtin.file:
+        path: "{{ immich_upload_location_read.stdout | trim }}"
+        state: directory
+        mode: '2775'
+      become: false
+
     - name: Start immich service with docker compose
       ansible.builtin.command: docker compose up -d
       args:
