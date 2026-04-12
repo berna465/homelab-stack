@@ -40,6 +40,9 @@
       path: "{{ nfs_check_path }}"
       ls_ldn: "{{ nfs_check_ls.stdout }}"
       expected_shared_gid: "{{ homelab_nfs_shared_group_gid }}"
+      path_uid: "{{ nfs_check_stat.stat.uid | default('unknown') }}"
+      path_gid: "{{ nfs_check_stat.stat.gid | default('unknown') }}"
+      path_mode: "{{ nfs_check_stat.stat.mode | default('unknown') }}"
       deploy_user: "{{ homelab_vm_deploy_user }}"
       deploy_user_groups: "{{ homelab_vm_deploy_user_groups | default([]) }}"
 
@@ -62,7 +65,14 @@
       primary GID={{ homelab_vm_deploy_user_gid | default('unknown') }},
       supplementary groups={{ homelab_vm_deploy_user_groups | default([]) | join(',') }}.
       Path diagnostics: {{ nfs_check_ls.stdout }}.
+      Numeric owner/group on path: UID={{ nfs_check_stat.stat.uid | default('unknown') }}, GID={{ nfs_check_stat.stat.gid | default('unknown') }}.
       Expected shared writable group GID={{ homelab_nfs_shared_group_gid }}.
+      {% if (nfs_check_stat.stat.uid | default(-1) | int) == 65534 or (nfs_check_stat.stat.gid | default(-1) | int) == 65534 %}
+      Detected UID/GID 65534 (nobody/nogroup) mapping on this path: this usually means QNAP NFS anonymous/all-squash mapping.
+      On NAS, disable anonymous squashing for this export OR map anonymous UID/GID to the intended writable identity,
+      then grant RW ACLs to that UID/GID and re-run.
+      {% else %}
       The VM deploy user is prepared for the expected group model, but NAS-side ACL/NFS export mapping
       is still denying writes. Fix permissions/ACL/export mapping on QNAP for this path and re-run.
+      {% endif %}
   when: nfs_check_write.rc != 0

@@ -68,6 +68,7 @@ Limits (important):
 
 - if NAS path exists but write probes still fail, this is typically NAS-side ACL/NFS export mapping behavior (common on QNAP)
 - playbooks fail clearly and report path + effective VM identity, but they do not attempt to force-fix NAS ACLs from the NFS client side
+- if path owner/group appears as `65534:65534` (`nobody/nogroup`), your NAS export is likely applying anonymous/all-squash mapping; adjust QNAP NFS export mapping and RW ACLs for the intended UID/GID
 
 ## Repository structure
 
