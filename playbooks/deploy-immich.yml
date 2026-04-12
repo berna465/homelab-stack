@@ -121,10 +121,25 @@
         base, base_order = parse_env(base_path)
         override, override_order = parse_env(override_path)
 
+        legacy_ml_cache = override.get("ML_CACHE_LOCATION", "").strip()
+        explicit_model_cache = override.get("IMMICH_MODEL_CACHE_LOCATION", "").strip()
+        if legacy_ml_cache and not explicit_model_cache:
+            override["IMMICH_MODEL_CACHE_LOCATION"] = legacy_ml_cache
+            if "IMMICH_MODEL_CACHE_LOCATION" not in override_order:
+                override_order.append("IMMICH_MODEL_CACHE_LOCATION")
+
+        if "ML_CACHE_LOCATION" in override:
+            del override["ML_CACHE_LOCATION"]
+        override_order = [key for key in override_order if key != "ML_CACHE_LOCATION"]
+
         for key in override_order:
             base[key] = override[key]
             if key not in base_order:
                 base_order.append(key)
+
+        if "ML_CACHE_LOCATION" in base:
+            del base["ML_CACHE_LOCATION"]
+        base_order = [key for key in base_order if key != "ML_CACHE_LOCATION"]
 
         lines = [f"{key}={base[key]}" for key in base_order]
         base_path.write_text("\\n".join(lines) + "\\n")
@@ -135,34 +150,31 @@
     - name: Validate immich required environment variables are set in runtime .env
       ansible.builtin.shell: |
         set -eu
-        python3 - <<'PY'
-        from pathlib import Path
+        required_vars='IMMICH_VERSION IMMICH_REDIS_IMAGE UPLOAD_LOCATION DB_DATA_LOCATION IMMICH_MODEL_CACHE_LOCATION IMMICH_REDIS_PATH DB_USERNAME DB_PASSWORD DB_DATABASE_NAME'
+        missing=""
+        for key in $required_vars; do
+          if ! awk -F= -v k="$key" '
+            BEGIN { found=0 }
+            $0 ~ /^[[:space:]]*#/ { next }
+            $1 ~ /^[[:space:]]*$/ { next }
+            {
+              gsub(/^[[:space:]]+|[[:space:]]+$/, "", $1)
+              if ($1 == k) {
+                value = substr($0, index($0, "=") + 1)
+                gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
+                if (length(value) > 0) { found=1; exit 0 }
+              }
+            }
+            END { if (!found) exit 1 }
+          ' .env; then
+            missing="${missing}${key}\n"
+          fi
+        done
 
-        required = [
-            "IMMICH_VERSION",
-            "IMMICH_REDIS_IMAGE",
-            "UPLOAD_LOCATION",
-            "DB_DATA_LOCATION",
-            "IMMICH_MODEL_CACHE_LOCATION",
-            "IMMICH_REDIS_PATH",
-            "DB_USERNAME",
-            "DB_PASSWORD",
-            "DB_DATABASE_NAME",
-        ]
-
-        values = {}
-        for raw_line in Path(".env").read_text().splitlines():
-            line = raw_line.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            key, value = line.split("=", 1)
-            values[key.strip()] = value.strip()
-
-        missing = [key for key in required if not values.get(key)]
-        if missing:
-            print("\\n".join(missing))
-            raise SystemExit(1)
-        PY
+        if [ -n "$missing" ]; then
+          printf "%b" "$missing"
+          exit 1
+        fi
       args:
         chdir: "{{ immich_app_dir }}"
       changed_when: false
