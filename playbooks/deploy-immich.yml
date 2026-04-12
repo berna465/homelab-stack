@@ -142,7 +142,7 @@
         base_order = [key for key in base_order if key != "ML_CACHE_LOCATION"]
 
         lines = [f"{key}={base[key]}" for key in base_order]
-        base_path.write_text("\\n".join(lines) + "\\n")
+        base_path.write_text("\n".join(lines) + "\n")
         PY
       changed_when: false
       when: immich_nas_env_stat.stat.exists and immich_nas_env_stat.stat.isreg
