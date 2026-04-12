@@ -94,6 +94,8 @@ ansible-playbook playbooks/deploy-all.yml
 
 This runs provisioning, disk prep, NFS mount, identity prep, NAS structure checks, and then deploys whoami + memos + journiv in sequence.
 
+If `apt/dpkg` is temporarily locked on the VM, the NFS mount step now waits for the package lock timeout instead of failing immediately.
+
 ### Step-by-step run
 
 1. Provision VM (create-only)
