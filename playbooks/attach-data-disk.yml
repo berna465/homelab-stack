@@ -4,6 +4,7 @@
   gather_facts: false
   vars_files:
     - ../group_vars/all.yml
+    - ../group_vars/homelab_core.yml
 
   tasks:
     - name: Read VM configuration
