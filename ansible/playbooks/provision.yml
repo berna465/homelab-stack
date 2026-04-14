@@ -1,9 +1,7 @@
 ---
 # Canonical compute/host baseline provisioning entrypoint.
-- import_playbook: ../../playbooks/provision.yml
-- import_playbook: ../../playbooks/attach-data-disk.yml
-- import_playbook: ../../playbooks/prepare-data-disk.yml
-- import_playbook: ../../playbooks/mount-nas-nfs.yml
-- import_playbook: ../../playbooks/prepare-identity-and-permissions.yml
-- import_playbook: ../../playbooks/prepare-nas-structure.yml
-- import_playbook: ../../playbooks/prepare-app-nas-paths.yml
+- import_playbook: ../../infra/proxmox/ansible/playbooks/provision-host.yml
+- import_playbook: ../../infra/proxmox/ansible/playbooks/attach-data-disk.yml
+- import_playbook: ../../infra/linux-host/ansible/playbooks/prepare-local-runtime-disk.yml
+- import_playbook: ../../infra/nas/ansible/playbooks/apply.yml
+- import_playbook: ../../platform/foundations/ansible/playbooks/apply.yml

@@ -1,3 +1,0 @@
----
-# Legacy alias: use ansible/playbooks/deploy.yml.
-- import_playbook: ../../ansible/playbooks/deploy.yml

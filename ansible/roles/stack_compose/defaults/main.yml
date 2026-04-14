@@ -1,0 +1,26 @@
+---
+stack_name: ""
+stack_app_dir: ""
+stack_compose_src: ""
+stack_env_example_src: ""
+stack_nas_env_file: ""
+stack_runtime_env_dest: "{{ stack_app_dir }}/.env"
+stack_copy_env_example_reference: false
+stack_env_example_reference_dest: "{{ stack_app_dir }}/.env.example"
+
+stack_local_directories: []
+stack_prepare_identity: true
+stack_nas_paths: []
+
+stack_required_env_vars: []
+stack_validate_required_env_vars: false
+
+stack_healthcheck_url: ""
+stack_healthcheck_headers: {}
+stack_healthcheck_follow_redirects: none
+stack_healthcheck_status: 200
+stack_healthcheck_status_codes: []
+stack_healthcheck_retries: 1
+stack_healthcheck_delay: 0
+
+stack_compose_pull: false

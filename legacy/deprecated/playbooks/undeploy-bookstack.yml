@@ -1,0 +1,3 @@
+---
+ # Legacy alias: use apps/deploy/ansible/playbooks/undeploy-bookstack.yml.
+- import_playbook: ../apps/deploy/ansible/playbooks/undeploy-bookstack.yml

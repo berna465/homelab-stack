@@ -15,4 +15,4 @@
 ## App starts but healthcheck fails
 
 - Confirm compose services are running on VM.
-- Check configured healthcheck URL/status in `group_vars/homelab_core.yml`.
+- Check configured healthcheck URL/status in `ansible/inventories/production/group_vars/homelab_core.yml`.

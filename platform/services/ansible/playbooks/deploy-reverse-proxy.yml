@@ -1,0 +1,78 @@
+---
+- name: Deploy reverse proxy platform service to homelab-core
+  hosts: homelab_core
+  gather_facts: false
+  become: true
+  vars_files:
+    - ../../../../ansible/inventories/production/group_vars/all.yml
+    - ../../../../ansible/inventories/production/group_vars/homelab_core.yml
+  pre_tasks:
+    - name: Load optional NAS group var and secret overrides
+      ansible.builtin.include_tasks: ../../../foundations/ansible/tasks/load-nas-overrides.yml
+      vars:
+        nas_override_var_files:
+          - "{{ nas_config_group_vars_dir }}/all.yml"
+          - "{{ nas_config_group_vars_dir }}/homelab_core.yml"
+          - "{{ nas_config_secrets_dir }}/all.yml"
+          - "{{ nas_config_secrets_dir }}/homelab_core.yml"
+
+    - name: Check optional reverse proxy NAS env override file
+      ansible.builtin.stat:
+        path: "{{ reverse_proxy_nas_env_file }}"
+      register: reverse_proxy_nas_env_stat
+
+  tasks:
+    - name: Ensure reverse proxy stack directories exist
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - "{{ reverse_proxy_app_dir }}"
+        - "{{ reverse_proxy_data_dir }}"
+
+    - name: Check whether proxy Docker network already exists
+      ansible.builtin.command: "docker network inspect {{ reverse_proxy_proxy_network }}"
+      changed_when: false
+      failed_when: false
+      register: reverse_proxy_network_inspect
+
+    - name: Create shared proxy Docker network when missing
+      ansible.builtin.command: "docker network create {{ reverse_proxy_proxy_network }}"
+      when: reverse_proxy_network_inspect.rc != 0
+
+    - name: Copy reverse proxy docker-compose definition
+      ansible.builtin.copy:
+        src: ../../stacks/infra-edge/compose.yaml
+        dest: "{{ reverse_proxy_app_dir }}/docker-compose.yml"
+        mode: '0644'
+
+    - name: Copy reverse proxy environment file from NAS override when available
+      ansible.builtin.copy:
+        src: "{{ reverse_proxy_nas_env_file }}"
+        dest: "{{ reverse_proxy_app_dir }}/.env"
+        remote_src: true
+        mode: '0644'
+      when: reverse_proxy_nas_env_stat.stat.exists and reverse_proxy_nas_env_stat.stat.isreg
+
+    - name: Copy reverse proxy environment file from repo default when NAS override is missing
+      ansible.builtin.copy:
+        src: ../../stacks/infra-edge/.env.example
+        dest: "{{ reverse_proxy_app_dir }}/.env"
+        mode: '0644'
+      when: not (reverse_proxy_nas_env_stat.stat.exists and reverse_proxy_nas_env_stat.stat.isreg)
+
+    - name: Start reverse proxy service with docker compose
+      ansible.builtin.command: docker compose up -d
+      args:
+        chdir: "{{ reverse_proxy_app_dir }}"
+
+    - name: Verify reverse proxy health endpoint returns 200
+      ansible.builtin.uri:
+        url: "{{ reverse_proxy_healthcheck_url }}"
+        status_code: "{{ reverse_proxy_healthcheck_status }}"
+        return_content: false
+      register: reverse_proxy_health
+      until: reverse_proxy_health.status == reverse_proxy_healthcheck_status
+      retries: 10
+      delay: 3

@@ -8,7 +8,9 @@
 
 ## Separation of concerns
 
-- **Provisioning**: host/compute baseline (VM, disks, NFS mounts, identity alignment).
+- **Provisioning**: substrate and host baseline.
+- **Foundations**: Linux-native runtime prerequisites and shared contracts.
+- **Platform services**: shared capabilities such as reverse proxy and smoke tests.
 - **Deploy**: application stacks and health checks.
 
 Canonical entrypoints:
@@ -16,6 +18,9 @@ Canonical entrypoints:
 - `ansible/playbooks/provision.yml`
 - `ansible/playbooks/deploy.yml`
 - `ansible/playbooks/site.yml`
+- `platform/services/ansible/playbooks/deploy-reverse-proxy.yml`
+- `platform/services/ansible/playbooks/deploy-whoami.yml`
+- `apps/deploy/ansible/playbooks/deploy-immich.yml`
 
 Legacy playbook aliases are preserved under `playbooks/` to avoid workflow breaks.
 

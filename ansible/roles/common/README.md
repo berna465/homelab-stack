@@ -1,4 +1,9 @@
 # role: common
 
 Placeholder role directory for target repository layout alignment.
-Current automation remains implemented in playbooks/tasks for compatibility.
+Shared runtime behavior now lives primarily under:
+
+- `platform/foundations/ansible/tasks/`
+- `platform/foundations/ansible/playbooks/`
+
+This placeholder should not receive new primary logic.

@@ -1,41 +1,55 @@
 # homelab-stack
 
-Repository per un homelab single-VM (`homelab-core`) con separazione esplicita tra provisioning compute e deploy applicativo.
+Repository per una piattaforma homelab Linux-first con separazione esplicita tra infrastruttura opzionale, foundations della piattaforma e deploy applicativo.
+
+## Architectural Direction
+
+This repository is being refactored toward four explicit layers:
+
+- `infra/`: provisioning e integrazione infrastrutturale environment-specific
+- `platform/foundations/`: runtime foundations Linux-native condivise
+- `platform/services/`: servizi condivisi di piattaforma
+- `apps/`: stack applicativi self-hosted e logica di deploy
+- `legacy/`: asset deprecated tenuti solo per migrazione
+
+Guiding principles:
+
+- `The runtime platform must be Linux-native; Proxmox is only one possible infrastructure substrate.`
+- `Provisioning is not the same as foundations, and foundations are not the same as application deployment.`
+
+This repository now treats the Ansible-based layered flow as canonical.
 
 ## Repository layout (target, con compatibilità legacy)
 
 ```text
 homelab-stack/
+├── infra/
+│   ├── proxmox/
+│   ├── linux-host/
+│   └── nas/
+├── platform/
+│   ├── foundations/
+│   └── services/
+├── apps/
+│   ├── stacks/
+│   └── deploy/
+├── legacy/
 ├── ansible/
-│   ├── inventories/production/
-│   │   ├── hosts.yml
-│   │   └── group_vars/
-│   │       ├── all.yml
-│   │       └── homelab_core.yml
-│   ├── playbooks/
-│   │   ├── provision.yml
-│   │   ├── deploy.yml
-│   │   └── site.yml
-│   └── roles/
 ├── stacks/
-│   ├── immich/
-│   ├── bookstack/
-│   ├── journiv/
-│   ├── jellyfin/
-│   ├── memos/
-│   └── whoami/
 ├── docs/
-│   ├── architecture/
-│   ├── operations/
-│   └── apps/
 └── scripts/
 ```
 
+Documentazione architetturale: `docs/ARCHITECTURE.md`
+
+Legacy assets migrated out of the primary path live under `legacy/deprecated/`.
+
 ## Provisioning vs Deploy
 
-- **Provisioning** (`ansible/playbooks/provision.yml`): prepara VM/host baseline, dischi, mount NFS, identity mapping.
-- **Deploy** (`ansible/playbooks/deploy.yml`): deploy degli stack applicativi.
-- **Site** (`ansible/playbooks/site.yml`): provisioning + deploy in sequenza.
+- **Provisioning**: prepara substrate e host raggiungibile.
+- **Foundations**: prepara il runtime Linux condiviso.
+- **Deploy**: deploy degli stack applicativi.
+- **Site** (`ansible/playbooks/site.yml`): orchestrazione completa del flusso attuale, mantenuta per compatibilità.
 
 ## Comandi principali
 
@@ -45,10 +59,29 @@ ansible-playbook ansible/playbooks/deploy.yml
 ansible-playbook ansible/playbooks/site.yml
 ```
 
+Canonical layered entrypoints:
+
+```bash
+ansible-playbook infra/proxmox/ansible/playbooks/provision-host.yml
+ansible-playbook infra/nas/ansible/playbooks/apply.yml
+ansible-playbook platform/foundations/ansible/playbooks/apply.yml
+ansible-playbook platform/services/ansible/playbooks/deploy-reverse-proxy.yml
+ansible-playbook platform/services/ansible/playbooks/deploy-whoami.yml
+ansible-playbook apps/deploy/ansible/playbooks/deploy-immich.yml
+ansible-playbook apps/deploy/ansible/playbooks/deploy-bookstack.yml
+ansible-playbook apps/deploy/ansible/playbooks/deploy-memos.yml
+```
+
 ### Resize root disk (step separato, se necessario)
 
 Per evitare problemi durante la creazione VM, l'allargamento del root filesystem non viene eseguito nel provisioning iniziale.
 Eseguilo come step successivo esplicito:
+
+```bash
+ansible-playbook infra/proxmox/ansible/playbooks/resize-root-disk.yml
+```
+
+Legacy alias ancora valido:
 
 ```bash
 ansible-playbook playbooks/resize-root-disk.yml
@@ -56,15 +89,22 @@ ansible-playbook playbooks/resize-root-disk.yml
 
 ### Alias legacy ancora validi
 
-- `playbooks/compute/provision-base.yml`
-- `playbooks/stacks/deploy-all-apps.yml`
-- `playbooks/deploy-all.yml`
+- `playbooks/provision.yml`
+- `playbooks/deploy.yml`
+- `playbooks/resize-root-disk.yml`
+- `playbooks/deploy-immich.yml`
+- `playbooks/undeploy-immich.yml`
+- `playbooks/tasks/*.yml`
+
+Wrapper legacy non più consigliati sono stati spostati in `legacy/deprecated/playbooks/`.
+
+I wrapper root-level restano solo per compatibilità e sono da considerarsi deprecated.
 
 ## Config e secrets
 
 Baseline target:
 
-- Repo: `stacks/<app>/.env.example` (non sensibile)
+- Repo: `apps/stacks/<app>/.env.example` (non sensibile)
 - NAS: `/mnt/nas/data/homelab-config/app-env/<app>.env` (override runtime)
 - NAS: `/mnt/nas/data/homelab-config/secrets/<app>/...` (secret file-based)
 - Runtime locale: `/data/stacks/<app>/.env` (materializzato da Ansible)
@@ -78,6 +118,9 @@ Uso secrets:
 
 - `all.yml`: sole convenzioni globali (path base, policy mount, UID/GID, timezone, convenzioni config).
 - `homelab_core.yml`: specificità nodo (`vm_id`, `vm_name`, `vm_ipconfig0`, stack/path override host-specifici).
+
+La source of truth runtime per le variabili è `ansible/inventories/production/group_vars/`.
+I file root `group_vars/` restano solo come compatibilità transitoria.
 
 ## Dove iniziare per aggiungere una nuova app
 

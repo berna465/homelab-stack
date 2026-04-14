@@ -1,0 +1,35 @@
+---
+- name: Deploy memos stack to homelab-core
+  hosts: homelab_core
+  gather_facts: false
+  become: true
+  vars_files:
+    - ../../../../ansible/inventories/production/group_vars/all.yml
+    - ../../../../ansible/inventories/production/group_vars/homelab_core.yml
+  pre_tasks:
+    - name: Load optional NAS group var and secret overrides
+      ansible.builtin.include_tasks: ../../../../platform/foundations/ansible/tasks/load-nas-overrides.yml
+      vars:
+        nas_override_var_files:
+          - "{{ nas_config_group_vars_dir }}/all.yml"
+          - "{{ nas_config_group_vars_dir }}/homelab_core.yml"
+          - "{{ nas_config_secrets_dir }}/all.yml"
+          - "{{ nas_config_secrets_dir }}/homelab_core.yml"
+  roles:
+    - role: stack_compose
+      vars:
+        stack_name: memos
+        stack_app_dir: "{{ memos_app_dir }}"
+        stack_compose_src: "{{ playbook_dir }}/../../../stacks/memos/compose.yaml"
+        stack_env_example_src: "{{ playbook_dir }}/../../../stacks/memos/.env.example"
+        stack_nas_env_file: "{{ memos_nas_env_file }}"
+        stack_local_directories:
+          - "{{ memos_app_dir }}"
+          - "{{ memos_data_dir }}"
+        stack_nas_paths:
+          - label: memos backups
+            path: "{{ memos_exports_dir }}"
+        stack_healthcheck_url: "{{ memos_healthcheck_url }}"
+        stack_healthcheck_headers:
+          Host: "{{ memos_hostname }}"
+        stack_healthcheck_status: "{{ memos_healthcheck_status }}"

@@ -1,0 +1,21 @@
+services:
+  memos:
+    image: ${MEMOS_IMAGE}
+    container_name: memos
+    restart: unless-stopped
+    volumes:
+      - "${MEMOS_DATA_PATH}:/var/opt/memos"
+    networks:
+      - default
+      - proxy
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=${MEMOS_PROXY_NETWORK}
+      - traefik.http.routers.memos.rule=Host(`${MEMOS_HOSTNAME}`)
+      - traefik.http.routers.memos.entrypoints=web
+      - traefik.http.services.memos.loadbalancer.server.port=5230
+
+networks:
+  proxy:
+    name: ${MEMOS_PROXY_NETWORK}
+    external: true

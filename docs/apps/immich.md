@@ -4,8 +4,8 @@
 
 Immich deploy remains compatible with the existing flow.
 
-- Compose source: `stacks/immich/compose.yaml`
-- Baseline env: `stacks/immich/.env.example`
+- Compose source: `apps/stacks/immich/compose.yaml`
+- Baseline env: `apps/stacks/immich/.env.example`
 - Runtime env: `/data/stacks/immich/.env`
 
 ## Storage mapping
@@ -22,7 +22,8 @@ Immich deploy remains compatible with the existing flow.
 Use `.env` fallback now; migrate selected variables to `*_FILE`/Docker secrets incrementally where support is clear and safe.
 ## Deploy implementation
 
-- Default path: `playbooks/deploy-immich.yml` -> `ansible/roles/stack_immich`
+- Canonical path: `apps/deploy/ansible/playbooks/deploy-immich.yml` -> `apps/deploy/ansible/roles/stack_immich`
+- Compatibility wrapper: `playbooks/deploy-immich.yml`
 - Fallback path: set `immich_use_role: false` to use legacy task flow.
 
 

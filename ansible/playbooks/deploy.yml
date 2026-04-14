@@ -1,8 +1,8 @@
 ---
 # Canonical application stack deployment entrypoint.
-- import_playbook: ../../playbooks/deploy.yml
-- import_playbook: ../../playbooks/deploy-memos.yml
-- import_playbook: ../../playbooks/deploy-journiv.yml
-- import_playbook: ../../playbooks/deploy-immich.yml
-- import_playbook: ../../playbooks/deploy-bookstack.yml
-- import_playbook: ../../playbooks/deploy-jellyfin.yml
+- import_playbook: ../../platform/services/ansible/playbooks/deploy-whoami.yml
+- import_playbook: ../../apps/deploy/ansible/playbooks/deploy-memos.yml
+- import_playbook: ../../apps/deploy/ansible/playbooks/deploy-journiv.yml
+- import_playbook: ../../apps/deploy/ansible/playbooks/deploy-immich.yml
+- import_playbook: ../../apps/deploy/ansible/playbooks/deploy-bookstack.yml
+- import_playbook: ../../apps/deploy/ansible/playbooks/deploy-jellyfin.yml

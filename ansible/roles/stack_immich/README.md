@@ -1,19 +1,8 @@
 # role: stack_immich
 
-First active role-based stack blueprint.
+Compatibility shim for the canonical Immich role now owned under `apps/deploy/ansible/roles/stack_immich`.
 
-## Responsibilities
-
-- ensure local runtime directories for Immich
-- verify required NAS paths are writable
-- sync `stacks/immich/compose.yaml`
-- generate runtime `.env` from repo baseline + optional NAS override
-- run `docker compose up -d`
-- execute post-deploy healthcheck
-
-## Rollback/compatibility
-
-`playbooks/deploy-immich.yml` supports fallback to legacy task flow with:
+`playbooks/deploy-immich.yml` still supports fallback to the legacy task flow with:
 
 ```yaml
 immich_use_role: false

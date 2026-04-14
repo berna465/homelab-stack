@@ -1,0 +1,53 @@
+---
+- name: Undeploy immich stack from homelab-core and delete state
+  hosts: homelab_core
+  gather_facts: false
+  become: true
+  vars_files:
+    - ../../../../ansible/inventories/production/group_vars/all.yml
+    - ../../../../ansible/inventories/production/group_vars/homelab_core.yml
+  vars:
+    immich_purge_local_state: true
+    immich_purge_nas_state: true
+  pre_tasks:
+    - name: Load optional NAS group var and secret overrides
+      ansible.builtin.include_tasks: ../../../../platform/foundations/ansible/tasks/load-nas-overrides.yml
+      vars:
+        nas_override_var_files:
+          - "{{ nas_config_group_vars_dir }}/all.yml"
+          - "{{ nas_config_group_vars_dir }}/homelab_core.yml"
+          - "{{ nas_config_secrets_dir }}/all.yml"
+          - "{{ nas_config_secrets_dir }}/homelab_core.yml"
+
+  tasks:
+    - name: Check immich stack directory exists
+      ansible.builtin.stat:
+        path: "{{ immich_app_dir }}"
+      register: immich_app_dir_stat
+
+    - name: Stop immich stack with docker compose down
+      ansible.builtin.command: docker compose down --remove-orphans
+      args:
+        chdir: "{{ immich_app_dir }}"
+      when: immich_app_dir_stat.stat.exists and immich_app_dir_stat.stat.isdir
+
+    - name: Delete immich local stack/state directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "{{ immich_app_dir }}"
+        - "{{ immich_runtime_dir }}"
+        - "{{ immich_db_dir }}"
+        - "{{ immich_cache_dir }}"
+      when: immich_purge_local_state | bool
+
+    - name: Delete immich NAS content and backup directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "{{ immich_content_dir }}"
+        - "{{ immich_exports_dir }}"
+      become: false
+      when: immich_purge_nas_state | bool

@@ -1,3 +1,0 @@
----
-# Legacy alias: use ansible/playbooks/provision.yml.
-- import_playbook: ../../ansible/playbooks/provision.yml

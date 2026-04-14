@@ -1,9 +1,0 @@
-services:
-  memos:
-    image: ${MEMOS_IMAGE}
-    container_name: memos
-    restart: unless-stopped
-    ports:
-      - "${MEMOS_PORT}:5230"
-    volumes:
-      - "${MEMOS_DATA_PATH}:/var/opt/memos"

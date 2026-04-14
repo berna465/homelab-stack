@@ -1,0 +1,27 @@
+services:
+  jellyfin:
+    image: ${JELLYFIN_IMAGE}
+    container_name: jellyfin
+    restart: unless-stopped
+    environment:
+      - TZ=${JELLYFIN_TZ}
+    volumes:
+      - ${JELLYFIN_CONFIG_PATH}:/config
+      - ${JELLYFIN_CACHE_PATH}:/cache
+      - ${JELLYFIN_MEDIA_MOVIES_PATH}:/media/movies:ro
+      - ${JELLYFIN_MEDIA_TV_PATH}:/media/tv:ro
+      - ${JELLYFIN_MEDIA_MUSIC_PATH}:/media/music:ro
+    networks:
+      - default
+      - proxy
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=${JELLYFIN_PROXY_NETWORK}
+      - traefik.http.routers.jellyfin.rule=Host(`${JELLYFIN_HOSTNAME}`)
+      - traefik.http.routers.jellyfin.entrypoints=web
+      - traefik.http.services.jellyfin.loadbalancer.server.port=8096
+
+networks:
+  proxy:
+    name: ${JELLYFIN_PROXY_NETWORK}
+    external: true

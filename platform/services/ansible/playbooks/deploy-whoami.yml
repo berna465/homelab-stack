@@ -1,0 +1,41 @@
+---
+- name: Deploy whoami smoke-test stack to homelab-core
+  hosts: homelab_core
+  gather_facts: false
+  become: true
+  vars_files:
+    - ../../../../ansible/inventories/production/group_vars/all.yml
+    - ../../../../ansible/inventories/production/group_vars/homelab_core.yml
+  pre_tasks:
+    - name: Load optional NAS group var and secret overrides
+      ansible.builtin.include_tasks: ../../../foundations/ansible/tasks/load-nas-overrides.yml
+      vars:
+        nas_override_var_files:
+          - "{{ nas_config_group_vars_dir }}/all.yml"
+          - "{{ nas_config_group_vars_dir }}/homelab_core.yml"
+          - "{{ nas_config_secrets_dir }}/all.yml"
+          - "{{ nas_config_secrets_dir }}/homelab_core.yml"
+
+  tasks:
+    - name: Ensure whoami stack directory exists
+      ansible.builtin.file:
+        path: "{{ homelab_core_app_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Copy whoami docker-compose definition
+      ansible.builtin.copy:
+        src: ../../stacks/whoami/compose.yaml
+        dest: "{{ homelab_core_app_dir }}/docker-compose.yml"
+        mode: '0644'
+
+    - name: Start whoami service with docker compose
+      ansible.builtin.command: docker compose up -d
+      args:
+        chdir: "{{ homelab_core_app_dir }}"
+
+    - name: Verify whoami HTTP endpoint returns 200
+      ansible.builtin.uri:
+        url: "{{ homelab_core_healthcheck_url }}"
+        status_code: "{{ homelab_core_healthcheck_status }}"
+        return_content: false

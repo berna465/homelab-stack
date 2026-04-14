@@ -1,0 +1,158 @@
+---
+- name: Validate stack_compose required inputs
+  ansible.builtin.assert:
+    that:
+      - stack_name | length > 0
+      - stack_app_dir | length > 0
+      - stack_compose_src | length > 0
+      - stack_env_example_src | length > 0
+    fail_msg: >-
+      stack_compose requires stack_name, stack_app_dir, stack_compose_src,
+      and stack_env_example_src.
+
+- name: Check optional stack NAS env override file
+  ansible.builtin.stat:
+    path: "{{ stack_nas_env_file }}"
+  register: stack_nas_env_stat
+  when: stack_nas_env_file | length > 0
+
+- name: Read optional stack NAS env override file content
+  ansible.builtin.slurp:
+    src: "{{ stack_nas_env_file }}"
+  register: stack_nas_env_content
+  when:
+    - stack_nas_env_file | length > 0
+    - stack_nas_env_stat.stat.exists | default(false)
+    - stack_nas_env_stat.stat.isreg | default(false)
+
+- name: Ensure stack local directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop: "{{ stack_local_directories }}"
+
+- name: Prepare deploy user and shared NFS group mapping
+  ansible.builtin.include_tasks: "{{ role_path }}/../../../platform/foundations/ansible/tasks/prepare-vm-identity.yml"
+  when: stack_prepare_identity | bool
+
+- name: Verify required NAS paths are present and writable
+  ansible.builtin.include_tasks: "{{ role_path }}/../../../platform/foundations/ansible/tasks/verify-nfs-path-writable.yml"
+  vars:
+    nfs_check_label: "{{ item.label }}"
+    nfs_check_path: "{{ item.path }}"
+  loop: "{{ stack_nas_paths }}"
+
+- name: Copy stack docker-compose definition
+  ansible.builtin.copy:
+    src: "{{ stack_compose_src }}"
+    dest: "{{ stack_app_dir }}/docker-compose.yml"
+    mode: '0644'
+
+- name: Copy stack environment example file for local reference
+  ansible.builtin.copy:
+    src: "{{ stack_env_example_src }}"
+    dest: "{{ stack_env_example_reference_dest }}"
+    mode: '0644'
+  when: stack_copy_env_example_reference | bool
+
+- name: Copy stack environment file from repo default baseline
+  ansible.builtin.copy:
+    src: "{{ stack_env_example_src }}"
+    dest: "{{ stack_runtime_env_dest }}"
+    mode: '0644'
+
+- name: Append stack environment file from NAS override when available
+  ansible.builtin.blockinfile:
+    path: "{{ stack_runtime_env_dest }}"
+    marker: "# {mark} ANSIBLE MANAGED STACK NAS OVERRIDE"
+    insertafter: EOF
+    block: "{{ stack_nas_env_content.content | b64decode }}"
+  when:
+    - stack_nas_env_file | length > 0
+    - stack_nas_env_stat.stat.exists | default(false)
+    - stack_nas_env_stat.stat.isreg | default(false)
+
+- name: Validate required environment variables are set
+  ansible.builtin.shell: |
+    set -eu
+    required_vars='{{ stack_required_env_vars | join(" ") }}'
+    missing=""
+    for key in $required_vars; do
+      if ! awk -F= -v k="$key" '
+        BEGIN { found=0 }
+        $0 ~ /^[[:space:]]*#/ { next }
+        {
+          key=$1
+          gsub(/^[[:space:]]+|[[:space:]]+$/, "", key)
+          if (key == k) {
+            value = substr($0, index($0, "=") + 1)
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
+            if (length(value) > 0) { found=1; exit 0 }
+          }
+        }
+        END { if (!found) exit 1 }
+      ' .env; then
+        missing="${missing}${key}\n"
+      fi
+    done
+
+    if [ -n "$missing" ]; then
+      printf "%b" "$missing"
+      exit 1
+    fi
+  args:
+    chdir: "{{ stack_app_dir }}"
+  changed_when: false
+  failed_when: false
+  register: stack_env_check
+  when:
+    - stack_validate_required_env_vars | bool
+    - stack_required_env_vars | length > 0
+
+- name: Fail when runtime .env is missing required variables
+  ansible.builtin.fail:
+    msg: >-
+      {{ stack_name }} runtime .env at {{ stack_runtime_env_dest }} is missing required variables:
+      {{ stack_env_check.stdout_lines | join(', ') }}.
+      Populate required values in {{ stack_env_example_src }} defaults and/or NAS override {{ stack_nas_env_file }}.
+  when:
+    - stack_validate_required_env_vars | bool
+    - stack_required_env_vars | length > 0
+    - stack_env_check.rc != 0
+
+- name: Pull stack images before deploy
+  ansible.builtin.command: docker compose pull
+  args:
+    chdir: "{{ stack_app_dir }}"
+  when: stack_compose_pull | bool
+
+- name: Start stack service with docker compose
+  ansible.builtin.command: docker compose up -d
+  args:
+    chdir: "{{ stack_app_dir }}"
+
+- name: Verify stack endpoint responds with accepted status code(s)
+  ansible.builtin.uri:
+    url: "{{ stack_healthcheck_url }}"
+    headers: "{{ stack_healthcheck_headers }}"
+    follow_redirects: "{{ stack_healthcheck_follow_redirects }}"
+    status_code: >-
+      {{
+        stack_healthcheck_status_codes
+        if (stack_healthcheck_status_codes | length > 0)
+        else stack_healthcheck_status
+      }}
+    return_content: false
+  register: stack_health
+  until: >-
+    (
+      stack_healthcheck_status_codes | length > 0
+      and stack_health.status in stack_healthcheck_status_codes
+    ) or (
+      stack_healthcheck_status_codes | length == 0
+      and stack_health.status == stack_healthcheck_status
+    )
+  retries: "{{ stack_healthcheck_retries }}"
+  delay: "{{ stack_healthcheck_delay }}"
+  when: stack_healthcheck_url | length > 0

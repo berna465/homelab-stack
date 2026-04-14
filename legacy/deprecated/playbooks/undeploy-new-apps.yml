@@ -1,0 +1,4 @@
+---
+- import_playbook: ../apps/deploy/ansible/playbooks/undeploy-immich.yml
+- import_playbook: ../apps/deploy/ansible/playbooks/undeploy-bookstack.yml
+- import_playbook: ../apps/deploy/ansible/playbooks/undeploy-jellyfin.yml

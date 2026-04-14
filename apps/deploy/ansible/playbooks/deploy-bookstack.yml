@@ -1,0 +1,58 @@
+---
+- name: Deploy bookstack stack to homelab-core
+  hosts: homelab_core
+  gather_facts: false
+  become: true
+  vars_files:
+    - ../../../../ansible/inventories/production/group_vars/all.yml
+    - ../../../../ansible/inventories/production/group_vars/homelab_core.yml
+  pre_tasks:
+    - name: Load optional NAS group var and secret overrides
+      ansible.builtin.include_tasks: ../../../../platform/foundations/ansible/tasks/load-nas-overrides.yml
+      vars:
+        nas_override_var_files:
+          - "{{ nas_config_group_vars_dir }}/all.yml"
+          - "{{ nas_config_group_vars_dir }}/homelab_core.yml"
+          - "{{ nas_config_secrets_dir }}/all.yml"
+          - "{{ nas_config_secrets_dir }}/homelab_core.yml"
+  roles:
+    - role: stack_compose
+      vars:
+        stack_name: bookstack
+        stack_app_dir: "{{ bookstack_app_dir }}"
+        stack_compose_src: "{{ playbook_dir }}/../../../stacks/bookstack/compose.yaml"
+        stack_env_example_src: "{{ playbook_dir }}/../../../stacks/bookstack/.env.example"
+        stack_nas_env_file: "{{ bookstack_nas_env_file }}"
+        stack_local_directories:
+          - "{{ bookstack_app_dir }}"
+          - "{{ bookstack_runtime_dir }}"
+          - "{{ bookstack_db_dir }}"
+        stack_nas_paths:
+          - label: bookstack content path
+            path: "{{ bookstack_content_dir }}"
+          - label: bookstack backups path
+            path: "{{ bookstack_exports_dir }}"
+        stack_validate_required_env_vars: true
+        stack_required_env_vars:
+          - BOOKSTACK_IMAGE
+          - BOOKSTACK_MARIADB_IMAGE
+          - BOOKSTACK_PROXY_NETWORK
+          - BOOKSTACK_HOSTNAME
+          - BOOKSTACK_RUNTIME_PATH
+          - BOOKSTACK_DB_PATH
+          - BOOKSTACK_CONTENT_PATH
+          - BOOKSTACK_PUID
+          - BOOKSTACK_PGID
+          - BOOKSTACK_TZ
+          - BOOKSTACK_APP_KEY
+          - BOOKSTACK_APP_URL
+          - BOOKSTACK_DB_NAME
+          - BOOKSTACK_DB_USER
+          - BOOKSTACK_DB_PASSWORD
+          - BOOKSTACK_DB_ROOT_PASSWORD
+        stack_healthcheck_url: "{{ bookstack_healthcheck_url }}"
+        stack_healthcheck_headers:
+          Host: "{{ bookstack_hostname }}"
+        stack_healthcheck_status_codes: "{{ bookstack_healthcheck_status_codes }}"
+        stack_healthcheck_retries: "{{ bookstack_healthcheck_retries }}"
+        stack_healthcheck_delay: "{{ bookstack_healthcheck_delay }}"

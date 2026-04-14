@@ -116,7 +116,13 @@ Do not treat `/mnt/nas/media` as generic writable app storage.
 
 ## Architecture boundaries
 
-- One VM only for now.
+- The runtime platform must be Linux-native; Proxmox is only one possible infrastructure substrate.
+- Provisioning is not the same as foundations, and foundations are not the same as application deployment.
+- `infra/` contains environment-specific provisioning only.
+- `platform/foundations/` contains Linux-native shared runtime prerequisites.
+- `platform/services/` contains shared platform capabilities, not application stacks.
+- `apps/` contains application stacks and deploy logic.
+- `legacy/` is isolated and must not receive new primary logic.
 - One app stack at a time.
 - Separate deploy playbook per app.
 - No reverse proxy/auth layer unless explicitly requested.

@@ -1,0 +1,2 @@
+---
+- import_playbook: ../infra/proxmox/ansible/playbooks/attach-data-disk.yml

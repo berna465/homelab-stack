@@ -2,10 +2,10 @@
 
 ## Regola adottata
 
-- `group_vars/all.yml` = variabili globali/convenzioni cross-host.
-- `group_vars/homelab_core.yml` = dettagli specifici del nodo/gruppo `homelab_core`.
+- `ansible/inventories/production/group_vars/all.yml` = variabili globali/convenzioni cross-host.
+- `ansible/inventories/production/group_vars/homelab_core.yml` = dettagli specifici del nodo/gruppo `homelab_core`.
 
-## Cosa sta in `all.yml`
+## Cosa sta in `ansible/inventories/production/group_vars/all.yml`
 
 - convenzioni storage locali (`/data/...`)
 - convenzioni NFS/NAS (`/mnt/nas/...`)
@@ -13,7 +13,7 @@
 - convenzioni override da NAS (`homelab-config/...`)
 - baseline infrastrutturale comune (es. sizing dischi)
 
-## Cosa sta in `homelab_core.yml`
+## Cosa sta in `ansible/inventories/production/group_vars/homelab_core.yml`
 
 - parametri istanza VM (`vm_id`, `vm_name`, `vm_ipconfig0`, risorse)
 - path e healthcheck stack app

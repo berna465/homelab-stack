@@ -1,0 +1,2 @@
+---
+- import_playbook: ../apps/deploy/ansible/playbooks/deploy-jellyfin.yml

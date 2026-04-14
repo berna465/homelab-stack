@@ -1,0 +1,154 @@
+---
+- name: Deploy journiv stack to homelab-core
+  hosts: homelab_core
+  gather_facts: false
+  become: true
+  vars_files:
+    - ../../../../ansible/inventories/production/group_vars/all.yml
+    - ../../../../ansible/inventories/production/group_vars/homelab_core.yml
+  pre_tasks:
+    - name: Load optional NAS group var and secret overrides
+      ansible.builtin.include_tasks: ../../../../platform/foundations/ansible/tasks/load-nas-overrides.yml
+      vars:
+        nas_override_var_files:
+          - "{{ nas_config_group_vars_dir }}/all.yml"
+          - "{{ nas_config_group_vars_dir }}/homelab_core.yml"
+          - "{{ nas_config_secrets_dir }}/all.yml"
+          - "{{ nas_config_secrets_dir }}/homelab_core.yml"
+
+    - name: Check optional journiv NAS env override file
+      ansible.builtin.stat:
+        path: "{{ journiv_nas_env_file }}"
+      register: journiv_nas_env_stat
+
+  tasks:
+    - name: Apply optional Journiv NAS path overrides when provided
+      ansible.builtin.set_fact:
+        journiv_content_dir: "{{ journiv_nas_content_root | default(journiv_content_dir) }}"
+        journiv_exports_dir: "{{ journiv_backup_root | default(journiv_exports_dir) }}"
+
+    - name: Re-apply canonical proxied Journiv healthcheck settings after NAS overrides
+      ansible.builtin.set_fact:
+        journiv_hostname: journiv.home.bernardolab.it
+        journiv_healthcheck_url: http://127.0.0.1/
+        journiv_healthcheck_status_codes:
+          - 200
+          - 301
+          - 302
+          - 307
+          - 308
+
+    - name: Show resolved journiv storage paths
+      ansible.builtin.debug:
+        msg:
+          ssh_user: "{{ ansible_user | default('unknown') }}"
+          stack_dir: "{{ journiv_app_dir }}"
+          runtime_dir: "{{ journiv_runtime_dir }}"
+          db_dir: "{{ journiv_db_dir }}"
+          cache_dir: "{{ journiv_cache_dir }}"
+          content_dir: "{{ journiv_content_dir }}"
+          exports_dir: "{{ journiv_exports_dir }}"
+
+    - name: Ensure journiv stack and local persistence directories exist
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - "{{ journiv_app_dir }}"
+        - "{{ journiv_runtime_dir }}"
+        - "{{ journiv_db_dir }}"
+        - "{{ journiv_cache_dir }}"
+
+    - name: Ensure journiv local writable runtime subdirectories exist
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ journiv_app_uid }}"
+        group: "{{ journiv_app_gid }}"
+        mode: '0775'
+      loop:
+        - "{{ journiv_runtime_dir }}"
+        - "{{ journiv_runtime_dir }}/logs"
+
+    - name: Prepare deploy user and shared NFS group mapping
+      ansible.builtin.include_tasks: ../../../../platform/foundations/ansible/tasks/prepare-vm-identity.yml
+
+    - name: Verify journiv NAS content path exists and is writable by deploy identity
+      ansible.builtin.include_tasks: ../../../../platform/foundations/ansible/tasks/verify-nfs-path-writable.yml
+      vars:
+        nfs_check_label: journiv content path
+        nfs_check_path: "{{ journiv_content_dir }}"
+
+    - name: Verify journiv NAS backups path exists and is writable by deploy identity
+      ansible.builtin.include_tasks: ../../../../platform/foundations/ansible/tasks/verify-nfs-path-writable.yml
+      vars:
+        nfs_check_label: journiv backups path
+        nfs_check_path: "{{ journiv_exports_dir }}"
+
+    - name: Copy journiv docker-compose definition
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../../../stacks/journiv/compose.yaml"
+        dest: "{{ journiv_app_dir }}/docker-compose.yml"
+        mode: '0644'
+
+    - name: Copy journiv environment file from NAS override when available
+      ansible.builtin.copy:
+        src: "{{ journiv_nas_env_file }}"
+        dest: "{{ journiv_app_dir }}/.env"
+        remote_src: true
+        mode: '0644'
+      when: journiv_nas_env_stat.stat.exists and journiv_nas_env_stat.stat.isreg
+
+    - name: Copy journiv environment file from repo default when NAS override is missing
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../../../stacks/journiv/.env.example"
+        dest: "{{ journiv_app_dir }}/.env"
+        mode: '0644'
+      when: not (journiv_nas_env_stat.stat.exists and journiv_nas_env_stat.stat.isreg)
+
+    - name: Validate journiv required environment variables are set
+      ansible.builtin.shell: |
+        set -eu
+        required_vars="JOURNIV_IMAGE JOURNIV_RUNTIME_PATH JOURNIV_CONTENT_PATH JOURNIV_POSTGRES_PATH JOURNIV_VALKEY_PATH JOURNIV_PROXY_NETWORK JOURNIV_HOSTNAME DOMAIN_NAME POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB"
+        missing=""
+        for key in $required_vars; do
+          value="$(grep -E "^${key}=" .env | tail -n1 | cut -d'=' -f2- || true)"
+          if [ -z "$value" ]; then
+            missing="$missing $key"
+          fi
+        done
+        if [ -n "$missing" ]; then
+          echo "$missing" | xargs -n1
+          exit 1
+        fi
+      args:
+        chdir: "{{ journiv_app_dir }}"
+      changed_when: false
+      failed_when: false
+      register: journiv_env_check
+
+    - name: Fail when journiv .env is missing required variables
+      ansible.builtin.fail:
+        msg: >-
+          Journiv .env at {{ journiv_app_dir }}/.env is missing required variables: {{ journiv_env_check.stdout_lines | join(', ') }}.
+          Populate the missing values in the NAS override env file ({{ journiv_nas_env_file }}) or in apps/stacks/journiv/.env.example before deploy.
+      when: journiv_env_check.rc != 0
+
+    - name: Start journiv service with docker compose
+      ansible.builtin.command: docker compose up -d
+      args:
+        chdir: "{{ journiv_app_dir }}"
+
+    - name: Verify journiv endpoint responds with an accepted status code
+      ansible.builtin.uri:
+        url: "{{ journiv_healthcheck_url }}"
+        headers:
+          Host: "{{ journiv_hostname }}"
+        follow_redirects: none
+        status_code: "{{ journiv_healthcheck_status_codes }}"
+        return_content: false
+      register: journiv_health
+      until: journiv_health.status in journiv_healthcheck_status_codes
+      retries: "{{ journiv_healthcheck_retries }}"
+      delay: "{{ journiv_healthcheck_delay }}"

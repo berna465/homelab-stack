@@ -1,0 +1,2 @@
+---
+- import_playbook: ../infra/linux-host/ansible/playbooks/prepare-local-runtime-disk.yml

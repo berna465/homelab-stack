@@ -49,11 +49,21 @@ homelab_core_nas_media_root: "{{ nas_nfs_mount_root }}/media"
 # Whoami stack settings.
 homelab_core_app_dir: "{{ homelab_core_stacks_root }}/whoami"
 
+# Reverse proxy platform service settings.
+reverse_proxy_app_dir: "{{ homelab_core_stacks_root }}/infra-edge"
+reverse_proxy_data_dir: "{{ homelab_core_runtime_root }}/reverse-proxy"
+reverse_proxy_proxy_network: proxy
+reverse_proxy_dashboard_port: 8081
+reverse_proxy_healthcheck_url: "http://127.0.0.1:{{ reverse_proxy_dashboard_port }}/ping"
+reverse_proxy_healthcheck_status: 200
+reverse_proxy_nas_env_file: "{{ nas_config_app_env_dir }}/infra-edge.env"
+
 # Memos stack settings.
 memos_app_dir: "{{ homelab_core_stacks_root }}/memos"
 memos_data_dir: "{{ homelab_core_runtime_root }}/memos"
 memos_exports_dir: "{{ homelab_core_nas_backups_root }}/memos"
-memos_healthcheck_url: http://127.0.0.1:5230
+memos_hostname: memos.home.bernardolab.it
+memos_healthcheck_url: http://127.0.0.1/
 memos_healthcheck_status: 200
 
 # Journiv stack settings.
@@ -65,7 +75,8 @@ journiv_content_dir: "{{ homelab_core_nas_apps_root }}/journiv"
 journiv_exports_dir: "{{ homelab_core_nas_backups_root }}/journiv"
 journiv_app_uid: 1000
 journiv_app_gid: 1000
-journiv_healthcheck_url: http://127.0.0.1:8010/
+journiv_hostname: journiv.home.bernardolab.it
+journiv_healthcheck_url: http://127.0.0.1/
 # Journiv root may redirect (for example to login); accept common success/redirect HTTP codes.
 journiv_healthcheck_status_codes:
   - 200
@@ -95,7 +106,8 @@ bookstack_runtime_dir: "{{ homelab_core_runtime_root }}/bookstack"
 bookstack_db_dir: "{{ homelab_core_db_root }}/bookstack-mariadb"
 bookstack_content_dir: "{{ homelab_core_nas_apps_root }}/bookstack/uploads"
 bookstack_exports_dir: "{{ homelab_core_nas_backups_root }}/bookstack"
-bookstack_healthcheck_url: http://127.0.0.1:6875/
+bookstack_hostname: bookstack.home.bernardolab.it
+bookstack_healthcheck_url: http://127.0.0.1/
 bookstack_healthcheck_status_codes:
   - 200
   - 301
@@ -109,7 +121,8 @@ jellyfin_runtime_dir: "{{ homelab_core_runtime_root }}/jellyfin"
 jellyfin_cache_dir: "{{ homelab_core_cache_root }}/jellyfin"
 jellyfin_media_root_dir: "{{ homelab_core_nas_media_root }}"
 jellyfin_exports_dir: "{{ homelab_core_nas_backups_root }}/jellyfin"
-jellyfin_healthcheck_url: http://127.0.0.1:8096/health
+jellyfin_hostname: jellyfin.home.bernardolab.it
+jellyfin_healthcheck_url: http://127.0.0.1/health
 jellyfin_healthcheck_status: 200
 
 # Stack activation flags (blueprint for role-based deploys).

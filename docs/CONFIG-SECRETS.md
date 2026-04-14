@@ -8,7 +8,7 @@
 
 ## Modello consigliato
 
-### 1) Repo (`files/homelab-core/<app>/.env.example`)
+### 1) Repo (`apps/stacks/<app>/.env.example`)
 
 Contiene:
 - variabili non sensibili

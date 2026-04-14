@@ -9,6 +9,17 @@ ansible-playbook ansible/playbooks/provision.yml
 ansible-playbook ansible/playbooks/deploy.yml
 ```
 
+Layered canonical entrypoints:
+
+```bash
+ansible-playbook infra/proxmox/ansible/playbooks/provision-host.yml
+ansible-playbook infra/nas/ansible/playbooks/apply.yml
+ansible-playbook platform/foundations/ansible/playbooks/apply.yml
+ansible-playbook platform/services/ansible/playbooks/deploy-reverse-proxy.yml
+ansible-playbook platform/services/ansible/playbooks/deploy-whoami.yml
+ansible-playbook apps/deploy/ansible/playbooks/deploy-immich.yml
+```
+
 Full run:
 
 ```bash
@@ -17,17 +28,20 @@ ansible-playbook ansible/playbooks/site.yml
 
 ## Compatibility aliases
 
-These continue to work:
+These continue to work but are deprecated:
 
-- `playbooks/compute/provision-base.yml`
-- `playbooks/stacks/deploy-all-apps.yml`
-- `playbooks/deploy-all.yml`
+- `playbooks/provision.yml`
+- `playbooks/deploy.yml`
+- `playbooks/resize-root-disk.yml`
+- `playbooks/deploy-immich.yml`
+- `playbooks/undeploy-immich.yml`
+
+Other removed wrappers now live under `legacy/deprecated/playbooks/`.
 
 ## Root disk resize (se necessario)
 
 L'allargamento del root filesystem è separato dalla creazione VM.
 
 ```bash
-ansible-playbook playbooks/resize-root-disk.yml
+ansible-playbook infra/proxmox/ansible/playbooks/resize-root-disk.yml
 ```
-
