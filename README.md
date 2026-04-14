@@ -19,7 +19,7 @@ Guiding principles:
 
 This repository now treats the Ansible-based layered flow as canonical.
 
-## Repository layout (target, con compatibilità legacy)
+## Repository layout
 
 ```text
 homelab-stack/
@@ -35,9 +35,8 @@ homelab-stack/
 │   └── deploy/
 ├── legacy/
 ├── ansible/
-├── stacks/
 ├── docs/
-└── scripts/
+└── secrets/
 ```
 
 Documentazione architetturale: `docs/ARCHITECTURE.md`
@@ -49,7 +48,7 @@ Legacy assets migrated out of the primary path live under `legacy/deprecated/`.
 - **Provisioning**: prepara substrate e host raggiungibile.
 - **Foundations**: prepara il runtime Linux condiviso.
 - **Deploy**: deploy degli stack applicativi.
-- **Site** (`ansible/playbooks/site.yml`): orchestrazione completa del flusso attuale, mantenuta per compatibilità.
+- **Site** (`ansible/playbooks/site.yml`): orchestrazione completa del flusso attuale.
 
 ## Comandi principali
 
@@ -81,25 +80,6 @@ Eseguilo come step successivo esplicito:
 ansible-playbook infra/proxmox/ansible/playbooks/resize-root-disk.yml
 ```
 
-Legacy alias ancora valido:
-
-```bash
-ansible-playbook playbooks/resize-root-disk.yml
-```
-
-### Alias legacy ancora validi
-
-- `playbooks/provision.yml`
-- `playbooks/deploy.yml`
-- `playbooks/resize-root-disk.yml`
-- `playbooks/deploy-immich.yml`
-- `playbooks/undeploy-immich.yml`
-- `playbooks/tasks/*.yml`
-
-Wrapper legacy non più consigliati sono stati spostati in `legacy/deprecated/playbooks/`.
-
-I wrapper root-level restano solo per compatibilità e sono da considerarsi deprecated.
-
 ## Config e secrets
 
 Baseline target:
@@ -120,7 +100,6 @@ Uso secrets:
 - `homelab_core.yml`: specificità nodo (`vm_id`, `vm_name`, `vm_ipconfig0`, stack/path override host-specifici).
 
 La source of truth runtime per le variabili è `ansible/inventories/production/group_vars/`.
-I file root `group_vars/` restano solo come compatibilità transitoria.
 
 ## Dove iniziare per aggiungere una nuova app
 

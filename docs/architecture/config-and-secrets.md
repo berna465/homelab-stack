@@ -7,7 +7,7 @@
 
 ## Runtime configuration pattern
 
-- Repo-safe defaults: `stacks/<app>/.env.example`
+- Repo-safe defaults: `apps/stacks/<app>/.env.example`
 - Optional NAS override env: `/mnt/nas/data/homelab-config/app-env/<app>.env`
 - Optional NAS secrets files: `/mnt/nas/data/homelab-config/secrets/<app>/...`
 - Runtime file materialized by Ansible: `/data/stacks/<app>/.env`

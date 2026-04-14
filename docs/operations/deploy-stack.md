@@ -26,18 +26,6 @@ Full run:
 ansible-playbook ansible/playbooks/site.yml
 ```
 
-## Compatibility aliases
-
-These continue to work but are deprecated:
-
-- `playbooks/provision.yml`
-- `playbooks/deploy.yml`
-- `playbooks/resize-root-disk.yml`
-- `playbooks/deploy-immich.yml`
-- `playbooks/undeploy-immich.yml`
-
-Other removed wrappers now live under `legacy/deprecated/playbooks/`.
-
 ## Root disk resize (se necessario)
 
 L'allargamento del root filesystem è separato dalla creazione VM.
